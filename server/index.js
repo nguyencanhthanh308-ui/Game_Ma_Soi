@@ -7,6 +7,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { Game, PHASE } = require('./Game');
 const { ROLE_INFO, isWolfTeam } = require('./roles');
+const { Chat } = require('./Chat');
+const { randomUUID } = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -56,23 +58,28 @@ function broadcastRoom(io, game) {
       payload.prompt = game.getPhasePrompt(player);
     }
     io.to(player.socketId).emit('private_state', payload);
+    io.to(player.socketId).emit('chat_state', game.chat.snapshot(game, player));
   }
 }
 
 io.on('connection', (socket) => {
   socket.on('create_room', ({ name }, cb) => {
+    if (socket.data.roomCode) return cb && cb({ ok: false, error: 'Bạn đã ở trong một phòng.' });
     const roomCode = generateRoomCode();
     const game = new Game(roomCode);
+    game.chat = new Chat();
     rooms.set(roomCode, game);
     const player = game.addPlayer(socket.id, name || 'Chu phong');
+    player.sessionToken = randomUUID();
     socket.join(roomCode);
     socket.data.roomCode = roomCode;
     socket.data.playerId = player.id;
-    cb && cb({ ok: true, roomCode, playerId: player.id });
+    cb && cb({ ok: true, roomCode, playerId: player.id, sessionToken: player.sessionToken });
     broadcastRoom(io, game);
   });
 
-  socket.on('join_room', ({ roomCode, name }, cb) => {
+  socket.on('join_room', ({ roomCode, name, sessionToken }, cb) => {
+    if (socket.data.roomCode) return cb && cb({ ok: false, error: 'Bạn đã ở trong một phòng.' });
     const code = (roomCode || '').toUpperCase().trim();
     const game = rooms.get(code);
     if (!game) return cb && cb({ ok: false, error: 'Khong tim thay phong. Kiem tra lai ma phong.' });
@@ -80,6 +87,10 @@ io.on('connection', (socket) => {
     // Cho phep vao lai neu dang trong ban choi va bi rot mang truoc do
     let player = null;
     if (game.phase !== PHASE.LOBBY) {
+      const returning = [...game.players.values()].find(p => p.sessionToken === sessionToken && sessionToken);
+      if (!returning || returning.name !== (name || '').trim().slice(0, 20)) {
+        return cb && cb({ ok: false, error: 'Không thể vào lại: phiên người chơi không hợp lệ.' });
+      }
       player = game.reconnectByName(socket.id, name);
       if (!player) return cb && cb({ ok: false, error: 'Ban choi da bat dau, khong the tham gia moi.' });
     } else {
@@ -87,12 +98,13 @@ io.on('connection', (socket) => {
       const dup = [...game.players.values()].some((p) => p.name === (name || '').trim().slice(0, 20));
       if (dup) return cb && cb({ ok: false, error: 'Ten nay da co nguoi dung, chon ten khac.' });
       player = game.addPlayer(socket.id, name);
+      player.sessionToken = randomUUID();
     }
 
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.playerId = player.id;
-    cb && cb({ ok: true, roomCode: code, playerId: player.id });
+    cb && cb({ ok: true, roomCode: code, playerId: player.id, sessionToken: player.sessionToken });
     broadcastRoom(io, game);
   });
 
@@ -111,6 +123,7 @@ io.on('connection', (socket) => {
 
     const result = game.startGame(roleConfig, durations);
     if (!result.ok) return cb && cb({ ok: false, error: result.errors.join('; ') });
+    game.chat.reset();
 
     cb && cb({ ok: true });
     game.enterNight(io, () => broadcastRoom(io, game));
@@ -122,6 +135,21 @@ io.on('connection', (socket) => {
     if (!game) return;
     game.recordAction(io, () => broadcastRoom(io, game), socket.data.playerId, type, payload || {});
     broadcastRoom(io, game);
+  });
+
+  socket.on('chat_send', (data, cb) => {
+    const game = rooms.get(socket.data.roomCode);
+    const player = game?.players.get(socket.data.playerId);
+    if (!player || !player.connected || player.socketId !== socket.id) {
+      return typeof cb === 'function' && cb({ ok: false, error: 'Bạn chưa kết nối vào phòng.' });
+    }
+    const result = game.chat.send(game, player, data);
+    if (result.ok) {
+      for (const recipient of game.players.values()) {
+        if (recipient.connected) io.to(recipient.socketId).emit('chat_state', game.chat.snapshot(game, recipient));
+      }
+    }
+    if (typeof cb === 'function') cb(result);
   });
 
   socket.on('restart_to_lobby', (_, cb) => {
@@ -141,6 +169,7 @@ io.on('connection', (socket) => {
     game.lastDeaths = [];
     game.nightNumber = 0;
     game.dayNumber = 0;
+    game.chat.reset();
     cb && cb({ ok: true });
     broadcastRoom(io, game);
   });
@@ -155,6 +184,9 @@ function handleLeave(socket) {
   const game = rooms.get(roomCode);
   if (!game) return;
   game.removePlayerBySocket(socket.id);
+  socket.leave(roomCode);
+  delete socket.data.roomCode;
+  delete socket.data.playerId;
   if (game.players.size === 0) {
     if (game.timer) clearTimeout(game.timer);
     rooms.delete(roomCode);

@@ -5,7 +5,10 @@ Thiết kế cho khoảng **12–15 người chơi** (hoạt động tốt từ 
 
 ## Cách chơi
 
-- Phần **nói chuyện, tranh luận, cãi nhau ban ngày** diễn ra qua voice call ngoài web (Discord, Zoom, Google Meet, hoặc ngồi cùng phòng nói chuyện trực tiếp).
+- **Chat trực tiếp trong phòng**: chat chung mở ở sảnh, khi thảo luận/bỏ phiếu ban ngày và sau khi kết thúc. Người đã chết chỉ được đọc trong lúc ván đang diễn ra.
+- **Chat riêng bầy Sói**: chỉ Sói còn sống được xem, gửi vào ban đêm (bao gồm Sói trắng). Kẻ bị nguyền sau khi hóa Sói chỉ nhận tin riêng từ thời điểm gia nhập bầy. Tin riêng không gửi đến client phe khác, kể cả chủ phòng.
+- Mỗi kênh giữ tối đa 100 tin, mỗi tin tối đa 500 ký tự; lịch sử xóa khi bắt đầu/chơi lại. Khi mất mạng, cùng tab tự kết nối lại bằng mã phiên riêng và lấy lại lịch sử được phép đọc. Không chia sẻ dữ liệu phiên cho người khác.
+- Có thể dùng voice call ngoài web nếu muốn nói chuyện bằng giọng nói.
 - Web app đóng vai trò **quản trò ảo**: tự động chia vai trò riêng tư cho từng người, dẫn dắt các lượt đêm (Sói cắn, Tiên tri soi, Phù thủy cứu/độc, Bảo vệ, Sói trắng, Cupid...), đếm ngược tự động chuyển pha, tổng hợp bỏ phiếu ban ngày, và báo thắng thua cuối game.
 - Mỗi người chơi tự mở link trên điện thoại/máy tính riêng của mình.
 
@@ -101,7 +104,7 @@ masoi-online/
 
 ## Giới hạn hiện tại / hướng mở rộng thêm
 
-- Chat trong game hiện chưa có (mặc định dùng voice call ngoài); có thể thêm ô chat text bằng cách emit thêm 1 socket event `chat_message`.
+- Chat chữ đã có trong game; chưa hỗ trợ gọi thoại trực tiếp.
 - Vai trò được lưu trong bộ nhớ server (không dùng database) — nếu server restart giữa ván, các phòng đang chơi sẽ mất. Phù hợp cho các buổi chơi ngắn vài giờ.
 - Chưa có xác thực người dùng — bất kỳ ai có link + mã phòng đều vào được, phù hợp chơi với bạn bè.
 - Vì trạng thái vai trò gửi qua socket riêng cho từng người, một người chơi cố tình mở DevTools vẫn có thể xem được dữ liệu gửi tới đúng socket của họ (nhưng không thấy được vai trò người khác trừ khi cùng phe Sói).

@@ -13,7 +13,7 @@
     <section id="screen-home" class="screen active">
       <div class="card">
         <h1>🐺 Ma Sói Online</h1>
-        <p class="subtitle">Web quản trò ảo cho hội bạn — nói chuyện qua voice call, web lo phần chia vai & đêm/ngày.</p>
+        <p class="subtitle">Chơi Ma Sói cùng bạn bè — chat thảo luận ngay trong phòng, bầy Sói có kênh riêng vào ban đêm.</p>
 
         <div class="tabs">
           <button class="tab-btn active" data-tab="create">Tạo phòng mới</button>
@@ -115,7 +115,24 @@
 
   <div id="toast" class="toast hidden"></div>
 
+  <section id="room-chat" class="room-chat hidden" aria-label="Trò chuyện trong phòng">
+    <h3>💬 Trò chuyện</h3>
+    <div class="chat-channels" aria-label="Chọn kênh chat">
+      <button id="chat-public" type="button" class="btn-secondary small" aria-pressed="true">Phòng chung</button>
+      <button id="chat-wolves" type="button" class="btn-secondary small hidden" aria-pressed="false">🐺 Bầy Sói · riêng tư</button>
+    </div>
+    <p id="chat-hint" class="hint-text"></p>
+    <ol id="chat-messages" class="chat-messages" aria-label="Tin nhắn" aria-live="polite" aria-relevant="additions"></ol>
+    <form id="chat-form" class="chat-form">
+      <label for="chat-input" class="chat-input-label">Tin nhắn vào phòng chung</label>
+      <input id="chat-input" type="text" maxlength="500" autocomplete="off" placeholder="Nhập tin nhắn…" />
+      <button id="chat-send" class="btn-primary small" type="submit">Gửi</button>
+    </form>
+    <p id="chat-error" class="error-text" role="status"></p>
+  </section>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
+  <script src="chat.js"></script>
 </body>
 </html>

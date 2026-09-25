@@ -132,3 +132,17 @@ input[type="text"] {
 .role-card .tag { display:inline-block; }
 .role-label summary { cursor:pointer; }
 .role-label details p { color:var(--text-dim); line-height:1.5; }
+
+.room-chat { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border); text-align: left; }
+.chat-channels { display: flex; gap: 8px; flex-wrap: wrap; }
+.chat-channels [aria-pressed="true"] { border-color: var(--accent-2); color: var(--accent-2); }
+.chat-messages { list-style: none; padding: 8px; margin: 12px 0; height: 250px; overflow-y: auto; background: var(--bg); border-radius: 10px; }
+.chat-message { padding: 9px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.chat-message strong { font-size: .85rem; color: var(--accent-2); }
+.chat-message time { float: right; font-size: .75rem; color: var(--text-dim); }
+.chat-message p { margin: 5px 0 0; white-space: pre-wrap; line-height: 1.45; }
+.chat-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.chat-input-label { width: 100%; font-size: .85rem; color: var(--text-dim); }
+.chat-form input[type="text"] { flex: 1; min-width: 0; width: auto; margin: 0; }
+.chat-form button { margin: 0; }
+button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }

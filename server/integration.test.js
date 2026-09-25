@@ -32,7 +32,8 @@ test('real server deals all 16 roles privately, sends descriptions and restarts'
     c.emit=(name,data)=>new Promise(resolve=>{const id=c.seq++;c.acks.set(id,resolve);ws.send('42'+id+JSON.stringify([name,data]));});
     return c;
   }
-  const host=await connect();const room=await host.emit('create_room',{name:'Host'});
+  let host=await connect();const room=await host.emit('create_room',{name:'Host'});
+  assert.ok((await host.emit('chat_send',{channel:'public',text:'Lobby hello'})).ok);
   for(let i=1;i<16;i++){const c=await connect();assert.ok((await c.emit('join_room',{roomCode:room.roomCode,name:'P'+i})).ok);}
   const roleConfig=Object.fromEntries(Object.keys(ROLE_INFO).map(id=>[id,1]));
   assert.ok((await host.emit('start_game',{roleConfig,durations:{NIGHT_CUPID:60}})).ok);
@@ -47,7 +48,34 @@ test('real server deals all 16 roles privately, sends descriptions and restarts'
     if(priv.role.id==='mason')assert.deepEqual(priv.allies,[]);
   }
   assert.equal(new Set(assigned).size,16);
+  const roleOf=c=>c.events.filter(e=>e[0]==='private_state'&&e[1].role).at(-1)[1].role.id;
+  const wolf=clients.find(c=>roleOf(c)==='werewolf');
+  const villager=clients.find(c=>roleOf(c)==='villager');
+  const wolfMessage='Private pack discussion';
+  assert.equal((await villager.emit('chat_send',{channel:'wolves',text:'Sneaking in'})).ok,false);
+  assert.equal((await villager.emit('chat_send',{channel:'public',text:'Night discussion'})).ok,false);
+  assert.ok((await wolf.emit('chat_send',{channel:'wolves',text:wolfMessage})).ok);
+  await new Promise(resolve=>setTimeout(resolve,100));
+  for(const c of clients) {
+    const chat=c.events.filter(e=>e[0]==='chat_state').at(-1)[1];
+    const isWolf=['werewolf','wolfcub','whitewolf'].includes(roleOf(c));
+    assert.equal(chat.messages.some(m=>m.text===wolfMessage),isWolf);
+    assert.equal(chat.messages.some(m=>m.text==='Lobby hello'),false);
+  }
+  const outsider=await connect();
+  assert.equal((await outsider.emit('chat_send',{channel:'wolves',text:'Outsider'})).ok,false);
+  assert.ok((await outsider.emit('create_room',{name:'Other room'})).ok);
+  assert.ok((await outsider.emit('chat_send',{channel:'public',text:'Separate room'})).ok);
+  await new Promise(resolve=>setTimeout(resolve,100));
+  assert.equal(wolf.events.filter(e=>e[0]==='chat_state').at(-1)[1].messages.some(m=>m.text==='Separate room'),false);
+  await new Promise(resolve=>{host.ws.once('close',resolve);host.ws.close();});
+  await new Promise(resolve=>setTimeout(resolve,100));
+  const intruder=await connect();
+  assert.equal((await intruder.emit('join_room',{roomCode:room.roomCode,name:'Host'})).ok,false);
+  host=await connect();
+  assert.ok((await host.emit('join_room',{roomCode:room.roomCode,name:'Host',sessionToken:room.sessionToken})).ok);
   assert.ok((await host.emit('restart_to_lobby',null)).ok);
   await new Promise(resolve=>setTimeout(resolve,100));
-  assert.ok(clients.every(c=>c.events.filter(e=>e[0]==='private_state').at(-1)[1].role===null));
+  assert.ok(clients.filter(c=>c.ws.readyState===WebSocket.OPEN && c.events.some(e=>e[0]==='private_state')).every(c=>c.events.filter(e=>e[0]==='private_state').at(-1)[1].role===null));
+  assert.equal(host.events.filter(e=>e[0]==='chat_state').at(-1)[1].messages.length,0);
 });

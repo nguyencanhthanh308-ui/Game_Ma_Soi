@@ -21,6 +21,7 @@ function client() {
   let count = 1;
   let requests = 0;
   const context = vm.createContext({
+    window: {},
     document: { getElementById: element, createElement: () => element(Symbol()), querySelectorAll: () => [], querySelector: () => element('screen-lobby') },
     io: () => ({ on(name, cb) { events[name] = cb; }, emit(name, data, cb) {
       if (name === 'get_role_suggestion') { requests++; cb({ ok: true, config: getDefaultRoleConfig(count), playerCount: count }); }

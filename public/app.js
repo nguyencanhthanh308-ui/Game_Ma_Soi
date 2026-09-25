@@ -51,6 +51,7 @@ function $(id) { return document.getElementById(id); }
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
   $(id).classList.add('active');
+  window.gameChat?.mount(id);
 }
 
 function toast(msg) {
@@ -83,7 +84,7 @@ $('btn-create').addEventListener('click', () => {
   if (!name) return ($('home-error').textContent = 'Nhập tên của bạn trước đã.');
   socket.emit('create_room', { name }, (res) => {
     if (!res.ok) return ($('home-error').textContent = res.error || 'Có lỗi xảy ra.');
-    onJoinedRoom(res.roomCode, res.playerId, name, true);
+    onJoinedRoom(res.roomCode, res.playerId, name, true, res.sessionToken);
   });
 });
 
@@ -93,11 +94,11 @@ $('btn-join').addEventListener('click', () => {
   if (!code || !name) return ($('home-error').textContent = 'Nhập đủ mã phòng và tên của bạn.');
   socket.emit('join_room', { roomCode: code, name }, (res) => {
     if (!res.ok) return ($('home-error').textContent = res.error || 'Có lỗi xảy ra.');
-    onJoinedRoom(res.roomCode, res.playerId, name, false);
+    onJoinedRoom(res.roomCode, res.playerId, name, false, res.sessionToken);
   });
 });
 
-function onJoinedRoom(roomCode, playerId, name, isHostGuess) {
+function onJoinedRoom(roomCode, playerId, name, isHostGuess, sessionToken) {
   state.roleConfig = null;
   state.roleConfigPlayerCount = null;
   state.roleConfigCustomized = false;
@@ -106,24 +107,30 @@ function onJoinedRoom(roomCode, playerId, name, isHostGuess) {
   state.roomCode = roomCode;
   state.playerId = playerId;
   state.myName = name;
-  sessionStorage.setItem('masoi_session', JSON.stringify({ roomCode, name }));
+  sessionStorage.setItem('masoi_session', JSON.stringify({ roomCode, name, sessionToken }));
   history.replaceState(null, '', '?room=' + roomCode);
   $('room-code-display').textContent = roomCode;
   showScreen('screen-lobby');
 }
 
 // Thu tu dong ket noi lai neu vua reload trang (giu phien choi)
-(function tryAutoRejoin() {
+socket.on('connect', function tryAutoRejoin() {
   const saved = sessionStorage.getItem('masoi_session');
   if (!saved) return;
   try {
-    const { roomCode, name } = JSON.parse(saved);
+    const { roomCode, name, sessionToken } = JSON.parse(saved);
     if (!roomCode || !name) return;
-    socket.emit('join_room', { roomCode, name }, (res) => {
-      if (res.ok) onJoinedRoom(res.roomCode, res.playerId, name, false);
+    socket.emit('join_room', { roomCode, name, sessionToken }, (res) => {
+      if (res.ok) onJoinedRoom(res.roomCode, res.playerId, name, false, res.sessionToken);
+      else {
+        sessionStorage.removeItem('masoi_session');
+        state.roomCode = null;
+        showScreen('screen-home');
+        $('home-error').textContent = res.error || 'Không thể vào lại phòng.';
+      }
     });
   } catch (e) { /* bo qua */ }
-})();
+});
 
 // ---------- Lobby ----------
 
@@ -231,7 +238,15 @@ function renderLobby(gs) {
   gs.players.forEach((p) => {
     const li = document.createElement('li');
     if (p.id === state.playerId) li.classList.add('me');
-    li.innerHTML = `<span>${p.name}${p.id === state.playerId ? ' (bạn)' : ''}</span>${p.isHost ? '<span class="tag">Chủ phòng</span>' : ''}`;
+    const label = document.createElement('span');
+    label.textContent = p.name + (p.id === state.playerId ? ' (bạn)' : '');
+    li.appendChild(label);
+    if (p.isHost) {
+      const badge = document.createElement('span');
+      badge.className = 'tag';
+      badge.textContent = 'Chủ phòng';
+      li.appendChild(badge);
+    }
     list.appendChild(li);
   });
 
@@ -453,7 +468,12 @@ function renderGameOver(gs) {
   list.innerHTML = '';
   gs.players.forEach((p) => {
     const li = document.createElement('li');
-    li.innerHTML = `<span>${p.alive ? '💚' : '💀'} ${p.name}</span><span class="tag">${p.roleName || '?'}</span>`;
+    const label = document.createElement('span');
+    label.textContent = `${p.alive ? '💚' : '💀'} ${p.name}`;
+    const badge = document.createElement('span');
+    badge.className = 'tag';
+    badge.textContent = p.roleName || '?';
+    li.append(label, badge);
     list.appendChild(li);
   });
   if (state.isHost) {

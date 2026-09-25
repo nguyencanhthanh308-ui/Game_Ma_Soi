@@ -318,7 +318,7 @@ function renderGamePlayerList(gs) {
     if (!p.alive) li.classList.add('dead');
     if (p.id === state.playerId) li.classList.add('me');
     const label = document.createElement('span');
-    label.textContent = `${p.alive ? '💚' : '💀'} ${p.name}${p.roleName ? ' (' + p.roleName + ')' : ''}`;
+    label.textContent = `${p.alive ? '💚' : '💀'} ${p.name}${p.alive && p.roleName ? ' (' + p.roleName + ')' : ''}`;
     li.appendChild(label);
     list.appendChild(li);
   });
@@ -326,7 +326,7 @@ function renderGamePlayerList(gs) {
 
 function renderDeathsBanner(gs) {
   if (gs.lastDeaths && gs.lastDeaths.length) {
-    const names = gs.lastDeaths.map((d) => `${d.name}${d.roleName ? ' (' + d.roleName + ')' : ''}`).join(', ');
+    const names = gs.lastDeaths.map((d) => d.name).join(', ');
     return `Đêm qua đã mất: ${names}.`;
   }
   if (gs.lastDeaths && gs.lastDeaths.length === 0) return 'Đêm qua bình yên vô sự, không ai chết.';
@@ -344,6 +344,26 @@ function renderActionArea(gs, priv) {
     if (banner) messageText = banner + (messageText ? ' ' + messageText : '');
   }
   $('phase-message').textContent = messageText || '...';
+
+  if (gs.phase === 'DAY_DISCUSSION') {
+    const alive = gs.players.filter(p => p.alive);
+    const votes = gs.skipDayVotes || [];
+    const agreed = alive.filter(p => votes.includes(p.id)).length;
+    const hint = document.createElement('p');
+    hint.className = 'hint-text';
+    hint.textContent = `Bỏ qua ngày: ${agreed}/${alive.length} người đồng ý. Tất cả người còn sống đồng ý thì vào đêm ngay, không treo cổ ai. Nếu chưa đủ, thảo luận và bỏ phiếu vẫn diễn ra bình thường.`;
+    area.appendChild(hint);
+    if (alive.some(p => p.id === state.playerId)) {
+      const skip = document.createElement('button');
+      skip.className = 'btn-secondary';
+      skip.textContent = votes.includes(state.playerId) ? 'Bạn đã đồng ý bỏ qua ngày' : 'Bỏ qua ngày → Đêm tiếp theo';
+      skip.disabled = votes.includes(state.playerId);
+      skip.addEventListener('click', () => {
+        socket.emit('player_action', { type: 'skip_day', payload: { dayNumber: gs.dayNumber } });
+      });
+      area.appendChild(skip);
+    }
+  }
 
   if (!prompt || !prompt.action) return;
 

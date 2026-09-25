@@ -14,7 +14,7 @@
     const active = id || document.querySelector('.screen.active')?.id;
     const visible = snapshot && ['screen-lobby', 'screen-game', 'screen-over'].includes(active);
     panel.classList.toggle('hidden', !visible);
-    if (visible) document.querySelector(`#${active} .card, #${active} .game-layout`).appendChild(panel);
+    if (visible) document.querySelector(`#${active}`).appendChild(panel);
   }
 
   function render() {

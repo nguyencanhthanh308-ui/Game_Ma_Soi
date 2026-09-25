@@ -133,7 +133,15 @@ input[type="text"] {
 .role-label summary { cursor:pointer; }
 .role-label details p { color:var(--text-dim); line-height:1.5; }
 
-.room-chat { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border); text-align: left; }
+.screen.chat-layout { flex-direction: column; justify-content: flex-start; gap: 24px; padding-top: 32px; padding-bottom: 32px; }
+.room-chat { width: 100%; max-width: 560px; min-width: 0; padding: 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; text-align: left; }
+.room-chat h3 { margin-top: 0; }
+@media (min-width: 960px) {
+  .screen.chat-layout { flex-direction: row; justify-content: center; align-items: flex-start; }
+  .chat-layout > .card, .chat-layout > .game-layout { min-width: 0; }
+  .room-chat { flex: 0 0 360px; position: sticky; top: 24px; }
+  .room-chat .chat-messages { height: clamp(220px, 45vh, 480px); }
+}
 .chat-channels { display: flex; gap: 8px; flex-wrap: wrap; }
 .chat-channels [aria-pressed="true"] { border-color: var(--accent-2); color: var(--accent-2); }
 .chat-messages { list-style: none; padding: 8px; margin: 12px 0; height: 250px; overflow-y: auto; background: var(--bg); border-radius: 10px; }

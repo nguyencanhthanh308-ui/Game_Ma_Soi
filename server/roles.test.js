@@ -16,6 +16,49 @@ function setup(roles) {
   return [g, [...g.players.values()]];
 }
 function bite(g, p) { g.night = g._emptyNightActions(); g.night.wolfVictims = [p.id]; g.night.currentWolfVictim = p.id; g._resolveNight(io, noop); }
+test('death announcements and public players hide dead roles until game over', () => {
+  const [g, players] = setup(['werewolf', 'seer', 'witch', 'guard', 'hunter', 'prince']);
+  players[5].revealedPrince = true;
+  g._applyDeaths(io, players.map(p => p.id));
+  for (const phase of [PHASE.DAY_ANNOUNCE, PHASE.DAY_DISCUSSION, PHASE.DAY_VOTE]) {
+    g.phase = phase;
+    const state = JSON.parse(JSON.stringify(g.publicState()));
+    assert.ok(state.players.every(p => !('role' in p) && !('roleName' in p)));
+    if (state.lastDeaths) {
+      assert.equal(state.lastDeaths.length, 6);
+      assert.ok(state.lastDeaths.every(p => !('role' in p) && !('roleName' in p)));
+    }
+  }
+  g.phase = PHASE.GAME_OVER;
+  assert.ok(g.publicPlayerList().every(p => p.role && p.roleName));
+});
+test('unanimous skip moves directly to night without killing and resets votes', () => {
+  const [g, players] = setup(['werewolf', 'villager', 'villager', 'villager', 'villager']);
+  players[4].alive = false;
+  g.phase = PHASE.DAY_DISCUSSION; g.dayNumber = 1;
+  const vote = p => g.recordAction(io, noop, p.id, 'skip_day', {dayNumber: 1});
+  vote(players[4]); assert.equal(g.skipDayVotes.size, 0);
+  vote(players[0]); vote(players[0]); assert.equal(g.skipDayVotes.size, 1);
+  vote(players[1]); vote(players[2]); assert.equal(g.phase, PHASE.DAY_DISCUSSION);
+  vote(players[3]); assert.equal(g.phase, PHASE.NIGHT_GUARD);
+  assert.equal(g.nightNumber, 2); assert.equal(g.alivePlayers().length, 4);
+  assert.equal(g.skipDayVotes.size, 0); assert.equal(g.lastVoteResult.eliminatedId, null);
+});
+test('skip rejects wrong phases and stale day requests; incomplete vote preserves normal timer flow', () => {
+  const [g, [p]] = setup(['werewolf', 'villager', 'villager', 'villager']);
+  g.dayNumber = 2;
+  for (const phase of [PHASE.NIGHT_WOLVES, PHASE.DAY_VOTE, PHASE.HUNTER_SHOT]) {
+    g.phase = phase;
+    g.recordAction(io, noop, p.id, 'skip_day', {dayNumber: 2});
+    assert.equal(g.skipDayVotes.size, 0);
+  }
+  g.phase = PHASE.DAY_DISCUSSION;
+  g.recordAction(io, noop, p.id, 'skip_day', {dayNumber: 1});
+  assert.equal(g.skipDayVotes.size, 0);
+  g.recordAction(io, noop, p.id, 'skip_day', {dayNumber: 2});
+  g._advanceFromTimer(io, noop);
+  assert.equal(g.phase, PHASE.DAY_VOTE);
+});
 test('16 role cards have complete instructions; defaults valid for 6–20 players', () => {
   assert.equal(Object.keys(ROLE_INFO).length,16);
   for (const r of Object.values(ROLE_INFO)) for (const field of ['name','desc','play','win','team','icon']) assert.ok(r[field]);

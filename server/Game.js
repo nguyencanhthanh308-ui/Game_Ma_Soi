@@ -64,6 +64,7 @@ class Game {
     this.doubleKillNextNight = false;
     this.lastProtectedId = null;
     this.dayVotes = {};
+    this.skipDayVotes = new Set();
     this.winner = null;
   }
 
@@ -203,6 +204,8 @@ class Game {
   // io duoc truyen vao de phat broadcast. onPhaseChange(io) la callback chinh
   // duoc goi tu server/index.js de gui du lieu qua socket.
   enterNight(io, broadcastFn) {
+    this.skipDayVotes.clear();
+    this.dayVotes = {};
     this.nightNumber += 1;
     this.night = this._emptyNightActions();
     this.night.remainingBites = this.doubleKillNextNight ? 2 : 1;
@@ -291,6 +294,15 @@ class Game {
       return;
     }
     if (!player.alive) return;
+    if (type === 'skip_day') {
+      if (this.phase !== PHASE.DAY_DISCUSSION || payload.dayNumber !== this.dayNumber) return;
+      this.skipDayVotes.add(player.id);
+      if (this.alivePlayers().every(p => this.skipDayVotes.has(p.id))) {
+        this.lastVoteResult = { eliminatedId: null, tally: {} };
+        this._afterDayFlow(io, broadcastFn);
+      }
+      return;
+    }
     const prompt = this.getPhasePrompt(player);
     if (prompt.action !== type) return;
     const validTarget = id => prompt.targets?.some(p => p.id === id);
@@ -595,8 +607,8 @@ class Game {
       alive: p.alive,
       connected: p.connected,
       // Khi game ket thuc, lo het vai tro cho moi nguoi xem
-      role: this.phase === PHASE.GAME_OVER || p.revealedPrince ? p.role : undefined,
-      roleName: (this.phase === PHASE.GAME_OVER || p.revealedPrince) && p.role ? ROLE_INFO[p.role].name : undefined,
+      role: this.phase === PHASE.GAME_OVER || (p.alive && p.revealedPrince) ? p.role : undefined,
+      roleName: (this.phase === PHASE.GAME_OVER || (p.alive && p.revealedPrince)) && p.role ? ROLE_INFO[p.role].name : undefined,
     }));
   }
 
@@ -681,6 +693,7 @@ class Game {
       actionRound: this.night.wolfRound,
       nightNumber: this.nightNumber,
       dayNumber: this.dayNumber,
+      skipDayVotes: this.phase === PHASE.DAY_DISCUSSION ? [...this.skipDayVotes] : [],
       players: this.publicPlayerList(),
       hostId: this.hostId,
       lastDeaths: this.phase === PHASE.DAY_ANNOUNCE || this.phase === PHASE.DAY_DISCUSSION ? this._recentDeathsSummary() : undefined,
@@ -692,7 +705,7 @@ class Game {
 
   _recentDeathsSummary() {
     // Chi lay nhung nguoi chet trong lan resolve gan nhat (dem hoac ban ngay)
-    return this.lastDeaths.slice(-4).map((d) => ({ name: d.name, roleName: ROLE_INFO[d.role]?.name }));
+    return this.lastDeaths.map((d) => ({ id: d.id, name: d.name }));
   }
 }
 

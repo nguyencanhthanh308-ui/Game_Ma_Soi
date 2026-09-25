@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ma Sói Online</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- MAN HINH: NHAP TEN / TAO PHONG / VAO PHONG -->
+    <section id="screen-home" class="screen active">
+      <div class="card">
+        <h1>🐺 Ma Sói Online</h1>
+        <p class="subtitle">Web quản trò ảo cho hội bạn — nói chuyện qua voice call, web lo phần chia vai & đêm/ngày.</p>
+
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="create">Tạo phòng mới</button>
+          <button class="tab-btn" data-tab="join">Tham gia phòng</button>
+        </div>
+
+        <div id="tab-create" class="tab-content active">
+          <input id="create-name" type="text" placeholder="Tên của bạn (chủ phòng)" maxlength="20" />
+          <button id="btn-create" class="btn-primary">Tạo phòng</button>
+        </div>
+
+        <div id="tab-join" class="tab-content">
+          <input id="join-code" type="text" placeholder="Mã phòng (VD: A1B2C)" maxlength="6" style="text-transform:uppercase" />
+          <input id="join-name" type="text" placeholder="Tên của bạn" maxlength="20" />
+          <button id="btn-join" class="btn-primary">Tham gia</button>
+        </div>
+
+        <p id="home-error" class="error-text"></p>
+      </div>
+    </section>
+
+    <!-- MAN HINH: LOBBY -->
+    <section id="screen-lobby" class="screen">
+      <div class="card">
+        <div class="room-header">
+          <div>
+            <div class="room-code-label">Mã phòng</div>
+            <div id="room-code-display" class="room-code"></div>
+          </div>
+          <button id="btn-share" class="btn-secondary small">📋 Copy link mời</button>
+        </div>
+
+        <h3>Người chơi (<span id="player-count">0</span>)</h3>
+        <ul id="player-list" class="player-list"></ul>
+
+        <div id="host-controls" class="host-controls hidden">
+          <h3>Cấu hình vai trò</h3>
+          <div id="role-config-grid" class="role-config-grid"></div>
+          <p id="role-config-error" class="error-text"></p>
+          <button id="btn-suggest" class="btn-secondary">🔄 Gợi ý lại theo số người</button>
+          <button id="btn-start" class="btn-primary">▶️ Bắt đầu ván chơi</button>
+        </div>
+        <p id="waiting-text" class="hint-text">Đang chờ chủ phòng bắt đầu ván chơi...</p>
+      </div>
+    </section>
+
+    <!-- MAN HINH: LO VAI TRO -->
+    <section id="screen-reveal" class="screen">
+      <div class="card center">
+        <div id="role-card" class="role-card">
+          <div id="role-icon" class="role-icon">🎭</div>
+          <h2 id="role-name">...</h2>
+          <p id="role-team" class="tag"></p>
+          <h3>Năng lực</h3><p id="role-desc"></p>
+          <h3>Cách chơi</h3><p id="role-play"></p>
+          <h3>Điều kiện thắng</h3><p id="role-win"></p>
+          <p class="hint-text">Luật áp dụng trong phòng này. Giữ bí mật lá bài của bạn.</p>
+          <div id="role-extra" class="role-extra"></div>
+        </div>
+        <button id="btn-continue" class="btn-primary">Tôi đã rõ, vào game!</button>
+      </div>
+    </section>
+
+    <!-- MAN HINH: TRONG GAME -->
+    <section id="screen-game" class="screen">
+      <div class="game-layout">
+        <div class="game-top">
+          <div class="phase-badge">
+            <span id="phase-title">--</span>
+            <span id="phase-timer" class="timer">--</span>
+          </div>
+          <button id="btn-toggle-role" class="btn-secondary small">Xem vai trò của tôi</button>
+        </div>
+
+        <div id="phase-message" class="phase-message"></div>
+
+        <div id="action-area" class="action-area"></div>
+
+        <div class="game-bottom">
+          <h4>Danh sách người chơi</h4>
+          <ul id="game-player-list" class="player-list compact"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAN HINH: KET THUC GAME -->
+    <section id="screen-over" class="screen">
+      <div class="card center">
+        <h1 id="winner-title">🎉 Kết thúc!</h1>
+        <p id="winner-reason"></p>
+        <h3>Vai trò của mọi người</h3>
+        <ul id="final-role-list" class="player-list"></ul>
+        <button id="btn-restart" class="btn-primary hidden">🔁 Chơi lại (về sảnh)</button>
+        <p id="restart-hint" class="hint-text"></p>
+      </div>
+    </section>
+
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

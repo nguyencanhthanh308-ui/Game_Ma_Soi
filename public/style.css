@@ -154,3 +154,7 @@ input[type="text"] {
 .chat-form input[type="text"] { flex: 1; min-width: 0; width: auto; margin: 0; }
 .chat-form button { margin: 0; }
 button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
+.chat-quote, .chat-reply-preview { margin: 8px 0; padding: 8px 10px; border-left: 3px solid var(--accent-2); background: var(--bg); color: var(--text-dim); font-size: .85rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.chat-reply-preview { display: flex; align-items: center; gap: 8px; }
+.chat-reply-preview span { flex: 1; min-width: 0; max-height: 90px; overflow-y: auto; }
+.chat-reply-button { border: 0; background: transparent; color: var(--accent-2); cursor: pointer; padding: 8px 0; font: inherit; font-size: .8rem; }

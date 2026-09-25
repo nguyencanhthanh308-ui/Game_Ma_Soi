@@ -34,7 +34,10 @@ class Chat {
     return {
       permissions,
       messages: this.messages.filter(m => m.channel === 'public' ||
-        (permissions.wolves.canRead && m.audience.includes(player.id))).map(({ audience, ...message }) => message),
+        (permissions.wolves.canRead && m.audience.includes(player.id))).map(({ audience, replyAudience, ...message }) => {
+          if (replyAudience && !replyAudience.includes(player.id)) return { ...message, replyTo: null };
+          return message;
+        }),
     };
   }
 
@@ -49,6 +52,12 @@ class Chat {
     if (now - (this.lastSent.get(player.id) ?? -Infinity) < 800) {
       return { ok: false, error: 'Bạn gửi quá nhanh. Hãy chờ một chút.' };
     }
+    let original = null;
+    if (data.replyToId != null) {
+      original = this.messages.find(m => m.id === data.replyToId && m.channel === data.channel &&
+        (m.channel === 'public' || m.audience.includes(player.id)));
+      if (!original) return { ok: false, error: 'Không thể trả lời tin này. Tin có thể đã hết lịch sử hoặc không thuộc kênh hiện tại.' };
+    }
     this.lastSent.set(player.id, now);
     const audience = data.channel === 'wolves'
       ? [...game.players.values()].filter(p => p.alive && isWolfTeam(p.role)).map(p => p.id)
@@ -56,6 +65,8 @@ class Chat {
     const message = {
       id: this.nextId++, channel: data.channel, playerId: player.id,
       name: player.name, text, sentAt: now, audience,
+      replyTo: original ? { id: original.id, playerId: original.playerId, name: original.name, text: original.text } : null,
+      replyAudience: original?.audience || null,
     };
     this.messages.push(message);
     // Bound each channel separately so public traffic cannot clear private history.

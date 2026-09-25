@@ -2,6 +2,24 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Chat } = require('./Chat');
 
+test('replies use server-owned quotes and cannot expose private or pre-conversion messages', () => {
+  const { chat, game, players: [wolf, cub, , villager, cursed] } = setup();
+  chat.send(game, wolf, {channel:'wolves',text:'Original secret'},1000);
+  const id = chat.messages[0].id;
+  cursed.role = 'werewolf';
+  assert.equal(chat.send(game,cursed,{channel:'wolves',text:'Guessing',replyToId:id},2000).ok,false);
+  assert.ok(chat.send(game,cub,{channel:'wolves',text:'Reply',replyToId:id,replyTo:{text:'fake'}},2000).ok);
+  assert.equal(chat.snapshot(game,wolf).messages[1].replyTo.text,'Original secret');
+  assert.equal(chat.snapshot(game,cursed).messages[0].replyTo,null);
+  assert.equal('replyAudience' in chat.snapshot(game,wolf).messages[1],false);
+  game.phase = 'DAY_DISCUSSION';
+  assert.equal(chat.send(game,wolf,{channel:'public',text:'Leak',replyToId:id},3000).ok,false);
+  assert.ok(chat.send(game,villager,{channel:'public',text:'Public original'},3000).ok);
+  const publicId = chat.messages.at(-1).id;
+  assert.ok(chat.send(game,wolf,{channel:'public',text:'@Player3 reply',replyToId:publicId},4000).ok);
+  assert.equal(chat.snapshot(game,villager).messages.at(-1).replyTo.name,villager.name);
+});
+
 function setup() {
   const players = ['werewolf', 'wolfcub', 'whitewolf', 'villager', 'cursed'].map((role, i) => ({ id: String(i), name: 'Player'+i, role, alive: true }));
   return { chat: new Chat(), game: { phase: 'NIGHT_WOLVES', players: new Map(players.map(p => [p.id, p])) }, players };

@@ -123,6 +123,10 @@
     </div>
     <p id="chat-hint" class="hint-text"></p>
     <ol id="chat-messages" class="chat-messages" aria-label="Tin nhắn" aria-live="polite" aria-relevant="additions"></ol>
+    <div id="chat-reply-preview" class="chat-reply-preview hidden">
+      <span id="chat-reply-text"></span>
+      <button id="chat-reply-cancel" type="button" class="btn-secondary small" aria-label="Hủy trả lời">Hủy</button>
+    </div>
     <form id="chat-form" class="chat-form">
       <label for="chat-input" class="chat-input-label">Tin nhắn vào phòng chung</label>
       <input id="chat-input" type="text" maxlength="500" autocomplete="off" placeholder="Nhập tin nhắn…" />

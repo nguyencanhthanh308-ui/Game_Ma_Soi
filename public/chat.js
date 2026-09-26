@@ -51,6 +51,9 @@
     const messages = snapshot.messages.filter(m => m.channel === channel);
     const key = channel + ':' + messages.map(m => m.id).join(',');
     const messagesChanged = key !== renderedKey;
+    const previousScrollTop = list.scrollTop;
+    const followLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 48 ||
+      !renderedKey.startsWith(channel + ':');
     if (messagesChanged) {
       list.replaceChildren();
       if (!messages.length) {
@@ -99,8 +102,19 @@
       renderedKey = key;
     }
     mount();
-    if (messagesChanged) list.scrollTop = list.scrollHeight;
+    if (messagesChanged) {
+      list.scrollTop = followLatest ? list.scrollHeight : previousScrollTop;
+      $('chat-latest').classList.toggle('hidden', followLatest);
+    }
   }
+
+  $('chat-latest').addEventListener('click', () => {
+    list.scrollTop = list.scrollHeight;
+    $('chat-latest').classList.toggle('hidden', true);
+  });
+  list.addEventListener('scroll', () => {
+    if (list.scrollHeight - list.scrollTop - list.clientHeight < 48) $('chat-latest').classList.toggle('hidden', true);
+  });
 
   function select(next) {
     drafts[channel] = input.value;

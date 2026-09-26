@@ -5,6 +5,7 @@ const socket = io();
 
 const PHASE_LABEL = {
   LOBBY: 'Sảnh chờ',
+  ROLE_REVEAL: 'Đọc vai và sẵn sàng',
   NIGHT_CUPID: '🌙 Đêm - Cupid',
   NIGHT_GUARD: '🌙 Đêm - Bảo vệ',
   NIGHT_WOLVES: '🌙 Đêm - Bầy Sói',
@@ -40,6 +41,7 @@ const state = {
   lastPrivate: null,
   selected: [],
   submittedForPhase: null,
+  pendingAction: null,
   hasSeenReveal: false,
   timerInterval: null,
 };
@@ -99,6 +101,10 @@ $('btn-join').addEventListener('click', () => {
 });
 
 function onJoinedRoom(roomCode, playerId, name, isHostGuess, sessionToken) {
+  state.pendingAction = null;
+  state.submittedForPhase = null;
+  state.lastGameState = null;
+  state.roleSuggestionPending = false;
   state.roleConfig = null;
   state.roleConfigPlayerCount = null;
   state.roleConfigCustomized = false;
@@ -134,9 +140,19 @@ socket.on('connect', function tryAutoRejoin() {
 
 // ---------- Lobby ----------
 
-$('btn-share').addEventListener('click', () => {
+$('btn-share').addEventListener('click', async () => {
   const url = location.origin + '?room=' + state.roomCode;
-  navigator.clipboard?.writeText(url).then(() => toast('Đã copy link mời!')).catch(() => toast(url));
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText(url);
+    $('share-fallback').classList.add('hidden');
+    toast('Đã copy link mời!');
+  } catch {
+    $('share-fallback').classList.remove('hidden');
+    $('share-url').value = url;
+    $('share-url').focus();
+    $('share-url').select();
+  }
 });
 
 $('btn-suggest').addEventListener('click', () => {
@@ -208,6 +224,10 @@ function renderRoleConfig() {
     const stepper = document.createElement('div');
     stepper.className = 'stepper';
     stepper.innerHTML = `<button data-role="${roleId}" data-delta="-1">−</button><span>${count}</span><button data-role="${roleId}" data-delta="1">+</button>`;
+    stepper.querySelectorAll('button').forEach(btn => {
+      btn.setAttribute('aria-label', `${Number(btn.dataset.delta) < 0 ? 'Giảm' : 'Tăng'} số lượng ${ROLE_NAMES[roleId]}`);
+      btn.disabled = Number(btn.dataset.delta) < 0 ? count === 0 : count >= max;
+    });
     grid.appendChild(row);
     grid.appendChild(stepper);
   });
@@ -225,9 +245,8 @@ function renderRoleConfig() {
   });
   const sum = Object.values(state.roleConfig).reduce((a, b) => a + b, 0);
   $('role-config-error').textContent = !ROLE_STEP_ORDER.length ? 'Đang tải danh sách vai. Nếu chờ lâu, hãy khởi động lại server rồi tải lại trang.'
-    : total < 6 ? `Cần ít nhất 6 người để bắt đầu (hiện có ${total}).`
     : sum === total ? '' : `Tổng vai trò: ${sum} / ${total} người chơi. Bấm “Gợi ý lại theo số người” để cân bằng.`;
-  $('btn-start').disabled = !ROLE_STEP_ORDER.length || total < 6 || sum !== total;
+  $('btn-start').disabled = !ROLE_STEP_ORDER.length || sum !== total;
 }
 
 function renderLobby(gs) {
@@ -285,11 +304,60 @@ function showReveal(privateState) {
   if (privateState.allies?.length) extra.textContent += ' Hội Tam điểm: ' + privateState.allies.join(', ');
   if (privateState.loverName) extra.textContent += ' Người yêu: ' + privateState.loverName + '. Hai bạn thắng riêng nếu là hai người cuối cùng.';
   showScreen('screen-reveal');
+  renderReady();
 }
 
 $('btn-continue').addEventListener('click', () => {
+  if (state.lastGameState?.phase === 'ROLE_REVEAL') {
+    if (socket.connected === false) return toast('Mất kết nối, hãy chờ kết nối lại.');
+    send('ready', {});
+    return;
+  }
   showScreen('screen-game');
 });
+
+$('btn-cancel-ready').addEventListener('click', () => {
+  if (socket.connected === false) return toast('Mất kết nối, hãy chờ kết nối lại.');
+  socket.emit('restart_to_lobby', null, res => { if (!res.ok) toast(res.error); });
+});
+
+function renderReady() {
+  const gs = state.lastGameState;
+  const waiting = gs?.phase === 'ROLE_REVEAL';
+  const me = gs?.players.find(p => p.id === state.playerId);
+  $('btn-continue').textContent = waiting ? (me?.ready ? 'Bạn đã sẵn sàng' : 'Tôi đã đọc vai, sẵn sàng!') : 'Vào game';
+  $('btn-continue').disabled = waiting && (!!me?.ready || !!state.pendingAction || socket.connected === false);
+  $('ready-status').textContent = waiting
+    ? `${gs.players.filter(p => p.ready).length}/${gs.players.length} người đã sẵn sàng. Chờ tất cả đọc vai và kết nối trước khi bắt đầu. Còn chờ: ${gs.players.filter(p => !p.ready || !p.connected).map(p => p.name + (!p.connected ? ' (mất kết nối)' : '')).join(', ') || 'không có'}.`
+    : '';
+  if (waiting && state.isHost) $('btn-cancel-ready').classList.remove('hidden');
+  else $('btn-cancel-ready').classList.add('hidden');
+}
+
+function voteSummary(result) {
+  const outcome = { tie: 'Hòa phiếu, không ai bị treo cổ.', no_votes: 'Không có phiếu chọn người, không ai bị treo cổ.',
+    prince_saved: `${result.targetName} là Hoàng tử và được miễn treo cổ lần đầu.`,
+    eliminated: `${result.targetName} bị treo cổ.` };
+  return `Ngày ${result.dayNumber}: ${outcome[result.outcome] || ''} Phiếu trắng: ${result.blankVotes}; chưa bỏ phiếu: ${result.missingVotes}.`;
+}
+
+function renderHistory(id, title, lines) {
+  const area = $(id);
+  const key = JSON.stringify([title, lines]);
+  if (area._historyKey === key) return;
+  area._historyKey = key;
+  const wasOpen = area.firstElementChild?.open || false;
+  area.innerHTML = '';
+  if (!lines.length) return;
+  const details = document.createElement('details');
+  details.className = 'history-panel';
+  details.open = wasOpen;
+  const heading = document.createElement('summary');
+  heading.textContent = `${title} (${lines.length})`;
+  details.appendChild(heading);
+  lines.slice().reverse().forEach(text => { const p = document.createElement('p'); p.textContent = text; details.appendChild(p); });
+  area.appendChild(details);
+}
 
 // ---------- Man hinh trong game ----------
 
@@ -318,7 +386,7 @@ function renderGamePlayerList(gs) {
     if (!p.alive) li.classList.add('dead');
     if (p.id === state.playerId) li.classList.add('me');
     const label = document.createElement('span');
-    label.textContent = `${p.alive ? '💚' : '💀'} ${p.name}${p.alive && p.roleName ? ' (' + p.roleName + ')' : ''}`;
+    label.textContent = `${p.alive ? '💚' : '💀'} ${p.name}${p.alive && p.roleName ? ' (' + p.roleName + ')' : ''}${p.connected === false ? ' · Mất kết nối' : ''}`;
     li.appendChild(label);
     list.appendChild(li);
   });
@@ -344,6 +412,16 @@ function renderActionArea(gs, priv) {
     if (banner) messageText = banner + (messageText ? ' ' + messageText : '');
   }
   $('phase-message').textContent = messageText || '...';
+  if (gs.phase === 'DAY_RESOLVE' && gs.lastVoteResult) $('phase-message').textContent = voteSummary(gs.lastVoteResult);
+  renderHistory('vote-history', 'Kết quả bỏ phiếu', (gs.voteHistory || []).map(voteSummary));
+  const checks = priv.seerHistory || [];
+  renderHistory('seer-history', 'Kết quả soi · chỉ bạn thấy', checks.map(r => `Đêm ${r.nightNumber}: ${r.targetName} — ${r.isWolf ? 'là Sói' : 'không phải Sói'} tại thời điểm soi.`));
+  if (checks.length) $('seer-history').classList.remove('hidden');
+  else $('seer-history').classList.add('hidden');
+  if (socket.connected === false) {
+    $('phase-message').textContent = 'Mất kết nối. Hành động tạm khóa đến khi vào lại phòng.';
+    return;
+  }
 
   if (gs.phase === 'DAY_DISCUSSION') {
     const alive = gs.players.filter(p => p.alive);
@@ -359,13 +437,21 @@ function renderActionArea(gs, priv) {
       skip.textContent = votes.includes(state.playerId) ? 'Bạn đã đồng ý bỏ qua ngày' : 'Bỏ qua ngày → Đêm tiếp theo';
       skip.disabled = votes.includes(state.playerId);
       skip.addEventListener('click', () => {
-        socket.emit('player_action', { type: 'skip_day', payload: { dayNumber: gs.dayNumber } });
+        send('skip_day', { dayNumber: gs.dayNumber });
       });
       area.appendChild(skip);
     }
   }
 
   if (!prompt || !prompt.action) return;
+
+  if (state.pendingAction?.context === actionContext(gs)) {
+    const p = document.createElement('p');
+    p.className = 'hint-text';
+    p.textContent = 'Đang chờ server xác nhận lựa chọn…';
+    area.appendChild(p);
+    return;
+  }
 
   if (state.submittedForPhase === gs.phase) {
     const p = document.createElement('p');
@@ -375,16 +461,20 @@ function renderActionArea(gs, priv) {
     return;
   }
 
-  state.selected = [];
-
   const maxSelect = prompt.action === 'cupid_choose' ? 2 : 1;
   const targets = prompt.targets || [];
+  const selectionKey = [gs.phase, gs.dayNumber, gs.nightNumber, gs.actionRound, prompt.action].join(':');
+  if (state.selectionKey !== selectionKey) state.selected = [];
+  state.selectionKey = selectionKey;
+  state.selected = state.selected.filter(id => targets.some(t => t.id === id)).slice(0, maxSelect);
 
   const listEl = document.createElement('div');
   targets.forEach((t) => {
     const btn = document.createElement('button');
     btn.className = 'target-btn';
     btn.textContent = t.name;
+    btn.setAttribute('aria-pressed', String(state.selected.includes(t.id)));
+    if (state.selected.includes(t.id)) btn.classList.add('selected');
     btn.addEventListener('click', () => {
       if (state.selected.includes(t.id)) {
         state.selected = state.selected.filter((x) => x !== t.id);
@@ -395,6 +485,7 @@ function renderActionArea(gs, priv) {
       listEl.querySelectorAll('.target-btn').forEach((b) => b.classList.remove('selected'));
       [...listEl.children].forEach((b, i) => {
         if (state.selected.includes(targets[i].id)) b.classList.add('selected');
+        b.setAttribute('aria-pressed', String(state.selected.includes(targets[i].id)));
       });
     });
     listEl.appendChild(btn);
@@ -471,15 +562,36 @@ function renderActionArea(gs, priv) {
   }
 }
 
+function actionContext(gs) {
+  return gs ? [gs.phase, gs.dayNumber, gs.nightNumber, gs.actionRound].join(':') : null;
+}
+
 function send(type, payload) {
-  state.submittedForPhase = state.lastGameState.phase;
-  socket.emit('player_action', { type, payload });
-  renderActionArea(state.lastGameState, state.lastPrivate);
+  if (socket.connected === false) return toast('Mất kết nối, lựa chọn chưa được gửi.');
+  if (state.pendingAction || !state.lastGameState) return;
+  const request = { context: actionContext(state.lastGameState), type };
+  state.pendingAction = request;
+  renderReady();
+  if (state.lastPrivate) renderActionArea(state.lastGameState, state.lastPrivate);
+  socket.timeout(5000).emit('player_action', { type, payload, actionContext: request.context }, (error, result) => {
+    if (state.pendingAction !== request) return;
+    state.pendingAction = null;
+    if (actionContext(state.lastGameState) !== request.context) return;
+    if (!error && result?.ok) {
+      if (type !== 'ready' && type !== 'skip_day') state.submittedForPhase = state.lastGameState.phase;
+    } else if (state.submittedForPhase !== state.lastGameState.phase) {
+      state.submittedForPhase = null;
+      toast(error ? 'Chưa nhận được xác nhận. Bạn có thể thử lại.' : result?.error || 'Không gửi được lựa chọn. Hãy thử lại.');
+    }
+    renderReady();
+    if (state.lastPrivate) renderActionArea(state.lastGameState, state.lastPrivate);
+  });
 }
 
 // ---------- Man hinh ket thuc ----------
 
 function renderGameOver(gs) {
+  renderHistory('final-vote-history', 'Kết quả bỏ phiếu', (gs.voteHistory || []).map(voteSummary));
   const w = gs.winner;
   const info = WINNER_LABEL[w.winner] || { title: 'Kết thúc ván chơi' };
   $('winner-title').textContent = info.title;
@@ -509,14 +621,29 @@ function renderGameOver(gs) {
 // ---------- Socket events ----------
 
 socket.on('game_state', (gs) => {
+  if (actionContext(state.lastGameState) !== actionContext(gs)) {
+    state.pendingAction = null;
+    state.submittedForPhase = null;
+  }
   const previousRound = state.lastGameState?.actionRound;
   const prevPhase = state.lastGameState ? state.lastGameState.phase : null;
   state.lastGameState = gs;
+  state.isHost = gs.players.some(p => p.id === state.playerId && p.isHost);
+  $('connection-status').classList.add('hidden');
+  renderReady();
+
+  if (gs.phase === 'ROLE_REVEAL') {
+    if (state.lastPrivate?.role) showReveal(state.lastPrivate);
+    return;
+  }
+  if (prevPhase === 'ROLE_REVEAL' && gs.phase !== 'LOBBY') showScreen('screen-game');
 
   if (gs.phase === 'LOBBY') {
     state.lastPrivate = null;
     state.hasSeenReveal = false;
     state.submittedForPhase = null;
+    state.selected = [];
+    state.selectionKey = null;
     renderLobby(gs);
     if (document.querySelector('.screen.active').id !== 'screen-lobby') showScreen('screen-lobby');
     return;
@@ -546,11 +673,15 @@ socket.on('game_state', (gs) => {
 });
 
 socket.on('private_state', (priv) => {
+  if (priv.actionContext === actionContext(state.lastGameState)) {
+    state.submittedForPhase = priv.submitted ? state.lastGameState.phase : null;
+  }
   if (state.lastPrivate?.role && priv.role && state.lastPrivate.role.id !== priv.role.id) state.hasSeenReveal = false;
   state.lastPrivate = priv;
   if (priv.role && !state.hasSeenReveal && state.lastGameState && state.lastGameState.phase !== 'LOBBY' && state.lastGameState.phase !== 'GAME_OVER') {
     state.hasSeenReveal = true;
     showReveal(priv);
+    renderActionArea(state.lastGameState, priv);
   } else if (state.lastGameState && state.lastGameState.phase !== 'LOBBY' && state.lastGameState.phase !== 'GAME_OVER') {
     renderActionArea(state.lastGameState, priv);
     if ($('screen-reveal').classList.contains('active') && priv.role) showReveal(priv);
@@ -559,4 +690,12 @@ socket.on('private_state', (priv) => {
 
 socket.on('seer_result', (res) => {
   toast(`🔮 ${res.targetName} ${res.isWolf ? 'LÀ SÓI 🐺' : 'không phải là Sói'}`);
+});
+
+socket.on('disconnect', () => {
+  state.pendingAction = null;
+  state.submittedForPhase = null;
+  $('connection-status').classList.remove('hidden');
+  renderReady();
+  if (state.lastGameState && state.lastPrivate) renderActionArea(state.lastGameState, state.lastPrivate);
 });

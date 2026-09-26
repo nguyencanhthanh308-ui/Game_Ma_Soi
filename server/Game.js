@@ -11,6 +11,7 @@ const {
 
 const PHASE = {
   LOBBY: 'LOBBY',
+  ROLE_REVEAL: 'ROLE_REVEAL',
   NIGHT_CUPID: 'NIGHT_CUPID',
   NIGHT_GUARD: 'NIGHT_GUARD',
   NIGHT_WOLVES: 'NIGHT_WOLVES',
@@ -66,6 +67,7 @@ class Game {
     this.dayVotes = {};
     this.skipDayVotes = new Set();
     this.winner = null;
+    this.voteHistory = [];
   }
 
   _emptyNightActions() {
@@ -170,6 +172,7 @@ class Game {
     this.dayVotes = {};
     this.lastDeaths = [];
     this.lastVoteResult = null;
+    this.voteHistory = [];
     this.afterHunterResume = null;
     this.roleConfig = roleConfig;
     if (durations) this.durations = { ...this.durations, ...durations };
@@ -191,11 +194,15 @@ class Game {
       p.biteCount = 0;
       p.doomedNight = null;
       p.revealedPrince = false;
+      p.ready = false;
+      p.seerHistory = [];
     });
 
     this.nightNumber = 0;
     this.dayNumber = 0;
     this.winner = null;
+    this.phase = PHASE.ROLE_REVEAL;
+    this.phaseEndsAt = null;
     return { ok: true };
   }
 
@@ -276,6 +283,8 @@ class Game {
         return this._goToPhase(io, broadcastFn, PHASE.DAY_VOTE);
       case PHASE.DAY_VOTE:
         return this._resolveDayVote(io, broadcastFn);
+      case PHASE.DAY_RESOLVE:
+        return this._afterVoteAnnouncement(io, broadcastFn);
       default:
         return;
     }
@@ -286,22 +295,31 @@ class Game {
   recordAction(io, broadcastFn, playerId, type, payload) {
     const player = this.players.get(playerId);
     if (!player) return;
+    if (type === 'ready') {
+      if (this.phase !== PHASE.ROLE_REVEAL || !player.connected) return;
+      if (player.ready) return true;
+      player.ready = true;
+      if ([...this.players.values()].every(p => p.ready && p.connected)) this.enterNight(io, broadcastFn);
+      else broadcastFn(io);
+      return true;
+    }
     if (this.phase === PHASE.HUNTER_SHOT && type === 'hunter_shoot') {
       if (player.id !== this.pendingHunterQueue[0]) return;
       if (!this.players.get(payload.targetId)?.alive) return;
       this._resolveHunterShot(payload.targetId);
       this._continueAfterHunter(io, broadcastFn);
-      return;
+      return true;
     }
     if (!player.alive) return;
     if (type === 'skip_day') {
       if (this.phase !== PHASE.DAY_DISCUSSION || payload.dayNumber !== this.dayNumber) return;
+      if (this.skipDayVotes.has(player.id)) return true;
       this.skipDayVotes.add(player.id);
       if (this.alivePlayers().every(p => this.skipDayVotes.has(p.id))) {
         this.lastVoteResult = { eliminatedId: null, tally: {} };
         this._afterDayFlow(io, broadcastFn);
-      }
-      return;
+      } else broadcastFn(io);
+      return true;
     }
     const prompt = this.getPhasePrompt(player);
     if (prompt.action !== type) return;
@@ -317,27 +335,29 @@ class Game {
         this.players.get(b).loverId = a;
         this.night.cupidPairChosen = true;
         this._goToPhase(io, broadcastFn, PHASE.NIGHT_GUARD);
+        return true;
       }
       return;
     }
 
     if (this.phase === PHASE.NIGHT_GUARD && type === 'guard_protect' && player.role === 'guard') {
       const target = payload.targetId;
-      if (target === this.lastProtectedId) return; // khong duoc trung nguoi cu
+      if (target && target === this.lastProtectedId) return; // khong duoc trung nguoi cu
       this.night.guardTarget = target || null;
       this._goToPhase(io, broadcastFn, PHASE.NIGHT_WOLVES);
-      return;
+      return true;
     }
 
     if (this.phase === PHASE.NIGHT_WOLVES && type === 'wolf_vote' && isWolfTeam(player.role)) {
       if (!payload.targetId) return;
+      if (this.night.wolfVotes[player.id] === payload.targetId) return true;
       this.night.wolfVotes[player.id] = payload.targetId;
       const wolves = this.aliveWolves();
       const allVoted = wolves.every((w) => this.night.wolfVotes[w.id] !== undefined);
       if (allVoted) {
         this._finishWolfRound(io, broadcastFn);
-      }
-      return;
+      } else broadcastFn(io);
+      return true;
     }
 
     if (this.phase === PHASE.NIGHT_WHITEWOLF && type === 'whitewolf_kill' && player.role === 'whitewolf') {
@@ -348,21 +368,24 @@ class Game {
         this.night.whiteWolfTarget = 'skip';
       }
       this._goToPhase(io, broadcastFn, PHASE.NIGHT_SEER);
-      return;
+      return true;
     }
 
     if (this.phase === PHASE.NIGHT_SEER && type === 'seer_check' && player.role === 'seer') {
       this.night.seerTarget = payload.targetId || null;
       const target = this.players.get(payload.targetId);
       if (target) {
-        io.to(player.socketId).emit('seer_result', {
+        const result = {
+          nightNumber: this.nightNumber,
           targetId: target.id,
           targetName: target.name,
           isWolf: isWolfTeam(target.role) || target.role === 'lycan',
-        });
+        };
+        (player.seerHistory ||= []).push(result);
+        io.to(player.socketId).emit('seer_result', result);
       }
       this._goToPhase(io, broadcastFn, PHASE.NIGHT_WITCH);
-      return;
+      return true;
     }
 
     if (this.phase === PHASE.NIGHT_WITCH && type === 'witch_action' && player.role === 'witch') {
@@ -375,16 +398,28 @@ class Game {
         player.hasUsedPoison = true;
       }
       this._resolveNight(io, broadcastFn);
-      return;
+      return true;
     }
 
     if (this.phase === PHASE.DAY_VOTE && type === 'day_vote') {
+      if (this.dayVotes[player.id] === (payload.targetId || null)) return true;
       this.dayVotes[player.id] = payload.targetId || null; // null = bo phieu trang
       const alive = this.alivePlayers();
       const allVoted = alive.every((p) => this.dayVotes[p.id] !== undefined);
       if (allVoted) this._resolveDayVote(io, broadcastFn);
-      return;
+      else broadcastFn(io);
+      return true;
     }
+  }
+
+  actionContext() {
+    return [this.phase, this.dayNumber, this.nightNumber, this.night.wolfRound].join(':');
+  }
+
+  hasSubmitted(player) {
+    if (this.phase === PHASE.DAY_VOTE) return Object.hasOwn(this.dayVotes, player.id);
+    if (this.phase === PHASE.NIGHT_WOLVES) return Object.hasOwn(this.night.wolfVotes, player.id);
+    return false;
   }
 
   _finishWolfRound(io, broadcastFn) {
@@ -537,7 +572,12 @@ class Game {
       const top = entries.filter(([, v]) => v === max).map(([k]) => k);
       if (top.length === 1) eliminatedId = top[0]; // hoa phieu -> khong ai bi treo co
     }
-    this.lastVoteResult = { eliminatedId, tally };
+    this.lastVoteResult = { dayNumber: this.dayNumber, eliminatedId, tally,
+      outcome: eliminatedId ? 'eliminated' : entries.length ? 'tie' : 'no_votes',
+      targetName: this.players.get(eliminatedId)?.name || null,
+      blankVotes: Object.values(this.dayVotes).filter(id => !id).length,
+      missingVotes: this.alivePlayers().length - Object.keys(this.dayVotes).length };
+    this.voteHistory.push(this.lastVoteResult);
     this.dayVotes = {};
 
     const eliminated = this.players.get(eliminatedId);
@@ -548,8 +588,13 @@ class Game {
     if (eliminated?.role === 'prince' && !eliminated.revealedPrince) {
       eliminated.revealedPrince = true;
       this.lastVoteResult.eliminatedId = null;
+      this.lastVoteResult.outcome = 'prince_saved';
     } else if (eliminatedId) this._applyDeaths(io, [eliminatedId]);
 
+    this._goToPhase(io, broadcastFn, PHASE.DAY_RESOLVE);
+  }
+
+  _afterVoteAnnouncement(io, broadcastFn) {
     if (this.pendingHunterQueue.length) {
       this.afterHunterResume = 'DAY';
       return this._goToPhase(io, broadcastFn, PHASE.HUNTER_SHOT);
@@ -578,7 +623,7 @@ class Game {
     }
 
     const wolfTeam = alive.filter((p) => isWolfTeam(p.role));
-    const villageTeam = alive.filter((p) => !isWolfTeam(p.role) && !this.night.wolfVictims.includes(p.id));
+    const villageTeam = alive.filter((p) => !isWolfTeam(p.role));
 
     if (wolfTeam.length === 0) {
       return { winner: 'village', reason: 'Tat ca Soi da bi tieu diet' };
@@ -606,6 +651,7 @@ class Game {
       isHost: p.isHost,
       alive: p.alive,
       connected: p.connected,
+      ready: !!p.ready,
       // Khi game ket thuc, lo het vai tro cho moi nguoi xem
       role: this.phase === PHASE.GAME_OVER || (p.alive && p.revealedPrince) ? p.role : undefined,
       roleName: (this.phase === PHASE.GAME_OVER || (p.alive && p.revealedPrince)) && p.role ? ROLE_INFO[p.role].name : undefined,
@@ -700,6 +746,7 @@ class Game {
       lastVoteResult: this.phase === PHASE.DAY_RESOLVE || this.phase === PHASE.NIGHT_GUARD ? this.lastVoteResult : undefined,
       winner: this.winner,
       roleConfig: this.roleConfig,
+      voteHistory: this.voteHistory,
     };
   }
 

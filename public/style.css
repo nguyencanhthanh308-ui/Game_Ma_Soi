@@ -36,6 +36,11 @@ body {
 .card.center { text-align: center; }
 
 h1 { margin-top: 0; font-size: 1.6rem; }
+h1, #role-name { font-family: Georgia, 'Times New Roman', serif; letter-spacing: .02em; }
+button, input { font-family: inherit; }
+button, summary, input { touch-action: manipulation; }
+:where(button, input, summary):focus-visible { outline: 3px solid var(--accent-2); outline-offset: 3px; }
+label { display: block; margin: 10px 0 6px; font-size: .9rem; color: var(--text-dim); }
 .subtitle { color: var(--text-dim); font-size: 0.9rem; }
 
 .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
@@ -64,7 +69,7 @@ input[type="text"] {
 .error-text { color: #ff8080; font-size: 0.85rem; min-height: 18px; }
 .hint-text { color: var(--text-dim); font-size: 0.85rem; text-align: center; }
 
-.room-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.room-header { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .room-code-label { font-size: 0.75rem; color: var(--text-dim); }
 .room-code { font-size: 1.8rem; font-weight: 800; letter-spacing: 4px; color: var(--accent-2); }
 
@@ -82,12 +87,12 @@ input[type="text"] {
 .role-config-grid .role-label { font-size: 0.9rem; }
 .role-config-grid .stepper { display: flex; align-items: center; gap: 8px; }
 .role-config-grid .stepper button {
-  width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border);
+  width: 44px; height: 44px; border-radius: 6px; border: 1px solid var(--border);
   background: #263047; color: var(--text); cursor: pointer; font-weight: 700;
 }
 .role-config-grid .stepper span { min-width: 20px; text-align: center; font-weight: 700; }
 
-.role-card { padding: 20px; }
+.role-card { padding: 20px; border-top: 2px solid var(--accent-2); border-bottom: 1px solid var(--border); margin-bottom: 20px; }
 .role-icon { font-size: 4rem; }
 .role-extra { margin-top: 10px; font-size: 0.85rem; color: var(--accent-2); }
 
@@ -112,7 +117,7 @@ input[type="text"] {
   color: var(--text); cursor: pointer; font-size: 0.95rem;
 }
 .target-btn:hover { border-color: var(--accent-2); }
-.target-btn.selected { border-color: var(--accent); background: #33202088; }
+.target-btn.selected { border-color: var(--accent-2); background: #f2b13418; box-shadow: inset 4px 0 var(--accent-2); }
 .action-buttons { display: flex; gap: 8px; margin-top: 10px; }
 
 .game-bottom h4 { margin-bottom: 8px; color: var(--text-dim); font-size: 0.85rem; text-transform: uppercase; }
@@ -121,10 +126,30 @@ input[type="text"] {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
   background: #263047; border: 1px solid var(--border); padding: 10px 18px; border-radius: 10px;
   font-size: 0.9rem; z-index: 999;
+  max-width: calc(100vw - 32px); width: max-content; overflow-wrap: anywhere;
 }
+
+#connection-status { position: sticky; top: 0; z-index: 100; margin: 0; padding: 12px 16px; background: #391f25; border-bottom: 1px solid #ff8080; text-align: center; }
+.history-panel { margin: 12px 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-card); text-align: left; }
+.history-panel summary { cursor: pointer; min-height: 24px; color: var(--accent-2); font-weight: 600; }
+.history-panel p { font-size: .9rem; line-height: 1.6; overflow-wrap: anywhere; border-top: 1px solid var(--border); padding-top: 10px; }
+.player-list li, .role-extra, .phase-message, #ready-status { overflow-wrap: anywhere; }
+.player-list li > span { min-width: 0; }
+.player-list .tag { flex-shrink: 0; margin-left: 8px; }
+.role-config-grid { grid-template-columns: minmax(0, 1fr) auto; }
+.role-label { min-width: 0; overflow-wrap: anywhere; }
+.btn-secondary.small, .btn-primary.small, .chat-reply-button, .tab-btn { min-height: 44px; }
+#chat-latest { color: var(--accent-2); width: 100%; margin: 0 0 12px; }
 
 @media (max-width: 480px) {
   .card { padding: 20px; }
+  .screen { padding: 12px; }
+  .role-card { padding: 12px 0; }
+  .game-layout { padding: 0; }
+  .game-top, .action-buttons { flex-wrap: wrap; }
+  .phase-badge { min-width: 140px; }
+  .role-config-grid { column-gap: 8px; }
+  .role-config-grid .stepper { gap: 4px; }
 }
 
 .role-card h3 { text-align:left; font-size:.95rem; color:var(--accent-2); margin-bottom:4px; }

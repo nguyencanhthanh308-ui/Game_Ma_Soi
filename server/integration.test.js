@@ -32,11 +32,20 @@ test('real server deals all 16 roles privately, sends descriptions and restarts'
     c.emit=(name,data)=>new Promise(resolve=>{const id=c.seq++;c.acks.set(id,resolve);ws.send('42'+id+JSON.stringify([name,data]));});
     return c;
   }
-  let host=await connect();const room=await host.emit('create_room',{name:'Host'});
+  let host=await connect();
+  for (const [event, data] of [['create_room', null], ['create_room', {name:{}}], ['join_room', {name:'Bad',roomCode:42}], ['start_game', null], ['player_action', {type:'cupid_choose',payload:{targetIds:{}}}]]) {
+    assert.equal((await host.emit(event, data)).ok, false);
+  }
+  const room=await host.emit('create_room',{name:'Host'});
+  assert.equal((await host.emit('start_game',{roleConfig:{werewolf:{valueOf:null,toString:null},villager:1}})).ok,false);
   assert.ok((await host.emit('chat_send',{channel:'public',text:'Lobby hello'})).ok);
   for(let i=1;i<16;i++){const c=await connect();assert.ok((await c.emit('join_room',{roomCode:room.roomCode,name:'P'+i})).ok);}
   const roleConfig=Object.fromEntries(Object.keys(ROLE_INFO).map(id=>[id,1]));
   assert.ok((await host.emit('start_game',{roleConfig,durations:{NIGHT_CUPID:60}})).ok);
+  await new Promise(resolve=>setTimeout(resolve,50));
+  assert.equal(host.events.filter(e=>e[0]==='game_state').at(-1)[1].phase,'ROLE_REVEAL');
+  assert.equal(host.events.filter(e=>e[0]==='game_state').at(-1)[1].phaseEndsAt,null);
+  for (const c of clients) c.ws.send('42'+JSON.stringify(['player_action',{type:'ready',payload:{}}]));
   await new Promise(resolve=>setTimeout(resolve,100));
   const assigned=[];
   for(const c of clients){
@@ -68,14 +77,54 @@ test('real server deals all 16 roles privately, sends descriptions and restarts'
   assert.ok((await outsider.emit('chat_send',{channel:'public',text:'Separate room'})).ok);
   await new Promise(resolve=>setTimeout(resolve,100));
   assert.equal(wolf.events.filter(e=>e[0]==='chat_state').at(-1)[1].messages.some(m=>m.text==='Separate room'),false);
+  const privateOf = c => c.events.filter(e=>e[0]==='private_state').at(-1)[1];
+  async function act(c, type, payload) {
+    c.ws.send('42'+JSON.stringify(['player_action',{type,payload}]));
+    await new Promise(resolve=>setTimeout(resolve,20));
+  }
+  const cupid = clients.find(c=>privateOf(c)?.role?.id==='cupid');
+  await act(cupid,'cupid_choose',{targetIds:privateOf(cupid).prompt.targets.slice(0,2).map(p=>p.id)});
+  const guard = clients.find(c=>privateOf(c)?.role?.id==='guard');
+  await act(guard,'guard_protect',{});
+  for (const c of clients.filter(c=>['werewolf','wolfcub','whitewolf'].includes(privateOf(c)?.role?.id))) {
+    await act(c,'wolf_vote',{targetId:privateOf(c).prompt.targets[0].id});
+  }
+  const whitewolf = clients.find(c=>privateOf(c)?.role?.id==='whitewolf');
+  await act(whitewolf,'whitewolf_kill',{});
+  const seer = clients.find(c=>privateOf(c)?.role?.id==='seer');
+  await act(seer,'seer_check',{targetId:privateOf(seer).prompt.targets[0].id});
+  assert.equal(privateOf(seer).seerHistory.length,1);
+  for (const c of clients.filter(c=>c!==seer && privateOf(c))) assert.deepEqual(privateOf(c).seerHistory,[]);
   await new Promise(resolve=>{host.ws.once('close',resolve);host.ws.close();});
   await new Promise(resolve=>setTimeout(resolve,100));
   const intruder=await connect();
   assert.equal((await intruder.emit('join_room',{roomCode:room.roomCode,name:'Host'})).ok,false);
   host=await connect();
   assert.ok((await host.emit('join_room',{roomCode:room.roomCode,name:'Host',sessionToken:room.sessionToken})).ok);
+  const offline = clients[1];
+  await new Promise(resolve=>{offline.ws.once('close',resolve);offline.ws.close();});
+  await new Promise(resolve=>setTimeout(resolve,100));
   assert.ok((await host.emit('restart_to_lobby',null)).ok);
   await new Promise(resolve=>setTimeout(resolve,100));
   assert.ok(clients.filter(c=>c.ws.readyState===WebSocket.OPEN && c.events.some(e=>e[0]==='private_state')).every(c=>c.events.filter(e=>e[0]==='private_state').at(-1)[1].role===null));
   assert.equal(host.events.filter(e=>e[0]==='chat_state').at(-1)[1].messages.length,0);
+  assert.deepEqual(privateOf(host).seerHistory,[]);
+  assert.equal(host.events.filter(e=>e[0]==='game_state').at(-1)[1].players.length,15);
+  const returning = await connect();
+  assert.ok((await returning.emit('join_room',{roomCode:room.roomCode,name:'P1'})).ok);
+  assert.equal((await host.emit('get_role_suggestion',null)).playerCount,16);
+  // A separate room demonstrates bounded abuse without interfering with the game above.
+  const spammer = await connect();
+  const spamRoom = await spammer.emit('create_room',{name:'Rate test'});
+  const observer = await connect();
+  assert.ok((await observer.emit('join_room',{roomCode:spamRoom.roomCode,name:'Observer'})).ok);
+  await new Promise(resolve=>setTimeout(resolve,30));
+  const before = observer.events.filter(e=>e[0]==='game_state').length;
+  for(let i=0;i<5;i++) spammer.ws.send('42'+JSON.stringify(['player_action',{type:'unknown',payload:{}}]));
+  assert.ok((await spammer.emit('get_role_suggestion',null)).ok);
+  for(let i=0;i<40;i++) spammer.ws.send('42'+JSON.stringify(['player_action',{type:'unknown',payload:{}}]));
+  assert.equal((await spammer.emit('get_role_suggestion',null)).ok,false);
+  await new Promise(resolve=>setTimeout(resolve,150));
+  assert.equal(observer.events.filter(e=>e[0]==='game_state').length,before);
+  assert.ok((await spammer.emit('get_role_suggestion',null)).ok);
 });

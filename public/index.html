@@ -8,6 +8,7 @@
 </head>
 <body>
   <div id="app">
+    <p id="connection-status" class="error-text hidden" role="status">Mất kết nối. Đang kết nối lại…</p>
 
     <!-- MAN HINH: NHAP TEN / TAO PHONG / VAO PHONG -->
     <section id="screen-home" class="screen active">
@@ -21,12 +22,15 @@
         </div>
 
         <div id="tab-create" class="tab-content active">
+          <label for="create-name">Tên của bạn</label>
           <input id="create-name" type="text" placeholder="Tên của bạn (chủ phòng)" maxlength="20" />
           <button id="btn-create" class="btn-primary">Tạo phòng</button>
         </div>
 
         <div id="tab-join" class="tab-content">
+          <label for="join-code">Mã phòng</label>
           <input id="join-code" type="text" placeholder="Mã phòng (VD: A1B2C)" maxlength="6" style="text-transform:uppercase" />
+          <label for="join-name">Tên của bạn</label>
           <input id="join-name" type="text" placeholder="Tên của bạn" maxlength="20" />
           <button id="btn-join" class="btn-primary">Tham gia</button>
         </div>
@@ -46,6 +50,10 @@
           <button id="btn-share" class="btn-secondary small">📋 Copy link mời</button>
         </div>
 
+        <div id="share-fallback" class="hidden">
+          <label for="share-url">Sao chép link này để mời bạn bè</label>
+          <input id="share-url" type="text" readonly />
+        </div>
         <h3>Người chơi (<span id="player-count">0</span>)</h3>
         <ul id="player-list" class="player-list"></ul>
 
@@ -53,6 +61,7 @@
           <h3>Cấu hình vai trò</h3>
           <div id="role-config-grid" class="role-config-grid"></div>
           <p id="role-config-error" class="error-text"></p>
+          <p class="hint-text">Cấu hình cần ít nhất 1 Sói và số Sói ít hơn số Dân (từ 3 người). Phòng 3–5 người phù hợp chơi thử.</p>
           <button id="btn-suggest" class="btn-secondary">🔄 Gợi ý lại theo số người</button>
           <button id="btn-start" class="btn-primary">▶️ Bắt đầu ván chơi</button>
         </div>
@@ -74,6 +83,8 @@
           <div id="role-extra" class="role-extra"></div>
         </div>
         <button id="btn-continue" class="btn-primary">Tôi đã rõ, vào game!</button>
+        <p id="ready-status" class="hint-text" role="status"></p>
+        <button id="btn-cancel-ready" class="btn-secondary hidden">Hủy chia vai, về sảnh</button>
       </div>
     </section>
 
@@ -91,6 +102,8 @@
         <div id="phase-message" class="phase-message"></div>
 
         <div id="action-area" class="action-area"></div>
+        <section id="seer-history" class="hidden" aria-label="Kết quả soi riêng"></section>
+        <section id="vote-history" aria-label="Kết quả bỏ phiếu"></section>
 
         <div class="game-bottom">
           <h4>Danh sách người chơi</h4>
@@ -106,6 +119,7 @@
         <p id="winner-reason"></p>
         <h3>Vai trò của mọi người</h3>
         <ul id="final-role-list" class="player-list"></ul>
+        <section id="final-vote-history" aria-label="Kết quả bỏ phiếu"></section>
         <button id="btn-restart" class="btn-primary hidden">🔁 Chơi lại (về sảnh)</button>
         <p id="restart-hint" class="hint-text"></p>
       </div>
@@ -123,6 +137,7 @@
     </div>
     <p id="chat-hint" class="hint-text"></p>
     <ol id="chat-messages" class="chat-messages" aria-label="Tin nhắn" aria-live="polite" aria-relevant="additions"></ol>
+    <button id="chat-latest" type="button" class="btn-secondary small hidden">Có tin mới ↓ Xem tin mới nhất</button>
     <div id="chat-reply-preview" class="chat-reply-preview hidden">
       <span id="chat-reply-text"></span>
       <button id="chat-reply-cancel" type="button" class="btn-secondary small" aria-label="Hủy trả lời">Hủy</button>

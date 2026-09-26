@@ -201,7 +201,7 @@ function getDefaultRoleConfig(n) {
   }
 
   const specialWolves = config.wolfcub + config.whitewolf;
-  const wolvesTotal = Math.max(2, Math.round(n / 3.2));
+  const wolvesTotal = n >= 3 && n < 5 ? 1 : Math.max(2, Math.round(n / 3.2));
   config.werewolf = Math.max(0, wolvesTotal - specialWolves);
 
   const used =
@@ -242,6 +242,8 @@ function validateRoleConfig(config, n) {
   if (total !== n) {
     errors.push(`Tong so vai tro (${total}) phai bang so nguoi choi (${n})`);
   }
+  // Never coerce values from a rejected configuration (JSON objects may override valueOf/toString).
+  if (errors.length) return errors;
   const wolfTotal = (config.werewolf || 0) + (config.wolfcub || 0) + (config.whitewolf || 0);
   if (wolfTotal < 1) {
     errors.push('Can it nhat 1 Soi trong game');

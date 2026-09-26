@@ -1,7 +1,12 @@
 # 🐺 Ma Sói Online
 
 Web app quản trò ảo cho trò chơi Ma Sói (Werewolf), chơi real-time qua Socket.io.
-Thiết kế cho khoảng **12–15 người chơi** (hoạt động tốt từ 6 đến 20 người).
+Thiết kế cho khoảng **12–15 người chơi**, tối đa 20 người. Có thể bắt đầu từ 3 người với cấu hình hợp lệ (ít nhất 1 Sói, số Sói ít hơn số Dân); phòng 3–5 người phù hợp chơi thử, chưa được kiểm chứng cân bằng.
+
+- Sau khi chia vai, tất cả người chơi phải xác nhận đã đọc vai và đang kết nối thì đêm đầu mới bắt đầu. Không có đồng hồ trong lúc đọc vai. Chủ phòng có thể hủy chia vai để về sảnh nếu có người không thể tiếp tục.
+- Kết quả bỏ phiếu được công bố trong 5 giây trước lượt tiếp theo và lưu để đọc lại trong ván, bao gồm hòa phiếu, phiếu trắng và Hoàng tử được miễn treo. Nếu Chán đời thắng, kết quả xuất hiện ngay ở màn kết thúc.
+- Tiên tri có lịch sử soi riêng theo đêm, giữ nguyên kết quả tại thời điểm soi và khôi phục khi kết nối lại. Lịch sử xóa khi về sảnh hoặc bắt đầu ván mới.
+- Khi mất kết nối, danh sách đánh dấu người offline và tạm khóa thao tác của người đó cho đến khi kết nối lại; offline không được tính là đồng ý bỏ qua ngày.
 
 ## Cách chơi
 
@@ -89,6 +94,12 @@ Web này là 1 server Node.js thông thường (Express + Socket.io), có thể 
 ### Biến môi trường
 
 - `PORT`: cổng server lắng nghe (mặc định `3000`). Hầu hết các nền tảng (Railway, Render...) tự set biến này, không cần chỉnh gì thêm.
+
+### Giới hạn thao tác và phòng bỏ trống
+
+- Mỗi kết nối có tối đa 30 thao tác tích lũy, phục hồi 10 thao tác/giây. Thao tác sai hoặc lặp lại không làm đổi trạng thái sẽ không phát lại dữ liệu cả phòng.
+- Tạo/vào phòng được giới hạn thêm theo địa chỉ kết nối: tối đa 60 lượt tích lũy, phục hồi 2 lượt/giây. Khi dùng reverse proxy, giới hạn này có thể được dùng chung cho các kết nối qua proxy; cần tính đến điều này khi triển khai cho nhiều nhóm.
+- Phòng đang chơi mà không còn ai kết nối được giữ tối đa 5 phút. Có người vào lại trước thời hạn thì hủy lịch xóa. Hết thời hạn, phòng và bộ đếm giờ bị dọn; người chơi cần tạo phòng mới. Sảnh chờ rỗng vẫn được xóa ngay.
 
 ## Cấu trúc code
 

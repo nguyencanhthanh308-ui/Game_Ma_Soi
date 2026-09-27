@@ -134,73 +134,89 @@
     }
     ctx.globalAlpha=1;
   }
-  // Draw at native pixel resolution, then enlarge by exactly 2x in CSS.
-  // Angular muzzle, digitigrade legs and layered fur distinguish wolves from villagers.
-  function wolfPortrait(ctx, id) {
-    const white=id==='whitewolf', cub=id==='wolfcub';
-    const ink='#101c24', dark=white?'#627f87':'#293c49';
-    const mid=white?'#a0b8b9':'#506b79', light=white?'#dfebe1':'#91acaf';
-    const fur=white?'#f5f3d9':'#bdccbd', eye=white?'#ef796c':'#ffd27e';
-    const shape=(c,p)=>poly(ctx,c,p);
-    rect(ctx,'#14282b',0,0,128,128);
-    for(let y=-27;y<=27;y++) {
-      const w=Math.floor(Math.sqrt(729-y*y));
-      rect(ctx,'#253f40',65-w,43+y,w*2,1);
+  // One character = one opaque pixel. Authored clusters, no antialiased paths.
+  const wolfSprite = [
+    '           ##',
+    '          #lh#      ##',
+    '          #lhh#    #lh#',
+    '          #lmhh#  #lmh#',
+    '          #lmmh###lmmh#',
+    '           #lmmlhhlmh#',
+    '          ##mmlhhhlmm##',
+    '         #dmmlhhhhlmmmd#',
+    '        #ddmmllhhllmmdd#',
+    '         #dmmllhllmmddd##',
+    '        #dmmlmmmmmdddddmm#',
+    '       #ddmlleellmdmmmllll##',
+    '        #dmm#e#dmmllllhhhhn#',
+    '       #ddmmlmmmlhhhhhhhhnn#',
+    '        #dmmlmlhhhhlllhhnn#',
+    '         #dmmlhhll#######',
+    '        ##dmmlhhlhht#ht#',
+    '       #dmmmlhhlmmlhhh#',
+    '      #dmmlllhhhlmm###',
+    '     #dmmllhhhhlhhlmd#',
+    '    #ddmllhhhlhhhlmmd##',
+    '   #dmmlllhhllhhlmmdmmd#',
+    '  #dmmlmllhllhhlmmdmmmd#',
+    '  #dmlmmmlhllhllmddmmld#',
+    ' #dmmllmdmlhlllmdddmmlmd#',
+    ' #dmmlmdmmllhlmmdddmmlmd#',
+    '  #mllmdmmmlmlmdddmmlmd#',
+    ' #dmml#dmmmlmmddd#dmmlmd#',
+    ' #dmmd#ddmmmmddd# #dmmlmd#',
+    ' #mml# #ddmmmdd#  #dmmlmd#',
+    '#dmml# #bbbbbbbb#  #dmmld#',
+    '#dmmd# #bggbgGgb#  #dmml#',
+    '#mmmd# #bbbbbbbb#   #mmd#',
+    '#mmlmd##rssrsrrr#   #mml#',
+    ' #mlmd#rssrssrrss#  #mml#',
+    ' #ttt##rssrssrrss#  #ttt#',
+    '  ### #rssrssrrsss#  ###',
+    '      #rssrssrrssr#',
+    '     #drssrssrrssrd#',
+    '     #mm#rsrr#rs#mm#',
+    '     #mlm###d###mml#',
+    '     #mllmd#  #dmml#',
+    '     #dmllm#  #dmml#',
+    '      #mllm#  #dmml#',
+    '      #dmlm#   #mml#',
+    '       #mlm#   #mml#',
+    '      #dml#    #dml#',
+    '     #dmml#     #mml#',
+    '     #mml#      #dmml#',
+    '    #dmml#      #dmml#',
+    '   #dmmll#      #dmmlm#',
+    '  #dmmllh#      #dmmlmm#',
+    '  #ttttt#       #tttttt#',
+    '   #####         ######'
+  ];
+  function wolfPortrait(ctx,id) {
+    const white=id==='whitewolf',cub=id==='wolfcub';
+    const palette={'#':'#101a28',d:white?'#596b85':'#283448',m:white?'#879bad':'#485870',l:white?'#bdcdd1':'#7b91a2',h:white?'#edf0dd':'#b6c5c3',t:'#ece4c7',e:white?'#eb7163':'#efbd63',n:'#182332',b:'#362a32',g:'#997047',G:'#e0b779',r:cub?'#914e49':'#554451',s:cub?'#bc775c':'#80606b'};
+    rect(ctx,'#14272b',0,0,64,64);
+    for(let y=-18;y<=18;y++) {
+      const w=Math.floor(Math.sqrt(324-y*y));
+      rect(ctx,'#233c40',33-w,25+y,w*2,1);
     }
-    for(let i=0;i<32;i++)rect(ctx,'#42605a',random(i)*124+2,random(i+12)*118+3,1,1);
-    rect(ctx,'#0d1d21',27,117,77,4);rect(ctx,'#102125',20,119,89,2);
-    // Tail, tucked behind the silhouette, with a pale fur tip.
-    shape(ink,[[82,83],[96,88],[108,80],[115,65],[119,76],[117,93],[105,105],[86,105]]);
-    shape(dark,[[87,89],[99,94],[110,86],[115,76],[113,93],[103,101],[87,101]]);
-    shape(light,[[110,86],[115,76],[113,91],[108,96],[104,94]]);
-    // Bent hocks and broad clawed feet.
-    for(const dx of [0,27]) {
-      shape(ink,[[40+dx,82],[59+dx,84],[56+dx,100],[51+dx,109],[58+dx,113],[58+dx,119],[34+dx,119],[34+dx,113],[40+dx,104],[37+dx,96]]);
-      shape(dark,[[43+dx,86],[55+dx,87],[52+dx,99],[47+dx,109],[53+dx,114],[38+dx,114],[45+dx,103],[41+dx,96]]);
-      shape(mid,[[43+dx,89],[47+dx,91],[46+dx,101],[41+dx,108],[39+dx,107],[43+dx,99]]);
-      for(let j=0;j<3;j++)shape(fur,[[38+dx+j*5,114],[40+dx+j*5,117],[36+dx+j*5,117]]);
+    for(let i=0;i<18;i++)rect(ctx,'#3a5352',random(i)*62+1,random(i+12)*59+1,1,1);
+    rect(ctx,'#0e1c24',14,59,38,2);
+    rect(ctx,'#102027',10,60,46,1);
+    const draw=(rows,ox,oy)=>rows.forEach((row,y)=>[...row].forEach((c,x)=>{if(palette[c])rect(ctx,palette[c],ox+x,oy+y,1,1);}));
+    draw(['           ##','          #h#','          #lh#','         #ml#','         #ml#','        #mml#','       #mml#','      #mmld#','    ##mmld#','####mmmlld#','#mmmmlldd#',' #ddddd##','  #####'],32,38);
+    draw(wolfSprite,15,5);
+    if(cub) {
+      rect(ctx,'#8e4547',25,24,9,2);rect(ctx,'#bd735a',27,24,5,1);
+      rect(ctx,'#8e4547',24,26,3,6);rect(ctx,'#bd735a',24,26,1,4);
     }
-    // Ragged leather waist wrap and torn belt.
-    shape(ink,[[43,65],[81,65],[88,91],[79,88],[73,96],[61,90],[52,94],[38,88]]);
-    shape('#574442',[[46,71],[78,71],[82,87],[73,91],[63,85],[52,89],[43,85]]);
-    shape('#89634b',[[47,73],[53,74],[50,86],[45,84]]);
-    shape('#342c32',[[66,74],[77,73],[78,87],[72,90]]);
-    // Powerful shoulders and hanging arms; tufts break the outline.
-    shape(ink,[[47,39],[36,43],[30,53],[25,58],[28,60],[23,73],[26,83],[35,87],[42,78],[42,67],[49,72],[76,72],[83,64],[85,78],[92,86],[102,82],[104,72],[99,57],[101,54],[91,43],[78,39]]);
-    shape(dark,[[46,43],[35,49],[33,58],[28,72],[30,80],[35,79],[39,63],[46,59],[47,68],[76,68],[84,57],[89,62],[91,77],[98,80],[100,73],[94,55],[86,46],[76,43]]);
-    shape(mid,[[40,45],[34,53],[36,55],[32,65],[37,62],[44,52],[48,54],[51,66],[70,68],[77,56],[87,53],[83,47],[72,43]]);
-    shape(light,[[42,44],[35,51],[40,50],[38,55],[45,51],[51,57],[54,65],[58,60],[64,69],[70,61],[74,63],[75,52],[83,50],[76,43]]);
-    shape(fur,[[49,45],[55,49],[61,48],[70,45],[73,51],[68,54],[67,60],[62,57],[60,63],[57,55],[52,55]]);
-    for(const dx of [0,65])for(let j=0;j<3;j++)shape(fur,[[28+dx+j*3,78],[30+dx+j*3,78],[29+dx+j*3,85]]);
-    rect(ctx,'#342d30',43,69,37,5);rect(ctx,'#a57e4d',57,69,8,6);rect(ctx,'#302c30',59,71,4,2);
-    // Tall triangular ears, cheek ruff and a projecting canine muzzle.
-    shape(ink,[[43,30],[39,12],[43,7],[55,21],[67,19],[82,7],[86,11],[82,31],[88,39],[81,40],[84,45],[74,48],[66,53],[53,48],[42,45],[45,40],[38,38]]);
-    shape(mid,[[46,30],[43,13],[54,26],[67,23],[81,12],[78,32],[83,37],[77,38],[79,42],[68,48],[55,44],[46,41],[49,37],[43,36]]);
-    shape(light,[[43,13],[47,16],[50,26],[46,25]]);
-    shape(light,[[78,17],[81,13],[78,28],[73,29]]);
-    shape('#72565c',[[46,18],[51,27],[47,28]]);shape('#72565c',[[78,19],[77,29],[72,30]]);
-    shape(dark,[[54,25],[60,23],[65,25],[69,23],[72,30],[68,33],[61,30],[55,33],[49,31]]);
-    shape(light,[[47,33],[52,31],[58,33],[55,35],[49,35]]);
-    shape(light,[[66,33],[72,30],[77,31],[76,34],[69,35]]);
-    rect(ctx,ink,49,34,9,3);rect(ctx,ink,67,33,9,3);
-    rect(ctx,eye,51,34,5,2);rect(ctx,eye,69,33,5,2);
-    rect(ctx,ink,54,34,1,2);rect(ctx,ink,71,33,1,2);
-    shape(fur,[[59,35],[66,34],[69,38],[76,40],[73,46],[65,49],[55,44],[53,40]]);
-    shape(light,[[55,40],[63,42],[73,41],[73,45],[65,47],[57,44]]);
-    shape(ink,[[64,37],[73,37],[75,40],[70,43],[65,41]]);
-    rect(ctx,'#829c9d',66,37,4,1);
-    shape(ink,[[56,43],[64,46],[72,44],[69,49],[62,49]]);
-    rect(ctx,'#f4e8ca',58,44,2,3);rect(ctx,'#f4e8ca',68,45,2,3);
-    // A cub's rust-red scarf; the white wolf wears a moon-silver clasp.
-    if(cub) {shape('#8e4841',[[47,47],[60,53],[75,48],[71,54],[60,57],[49,52]]);shape('#b16950',[[49,51],[45,62],[48,67],[54,54]]);}
-    if(white) {rect(ctx,'#d6c696',62,54,3,6);rect(ctx,'#f5eed1',61,56,5,2);}
+    if(white) {rect(ctx,'#e0c999',31,25,1,3);rect(ctx,'#f5e8c6',30,26,3,1);}
   }
   function portrait(role) {
     const canvas=document.getElementById('role-portrait');
     const ctx=canvas?.getContext('2d');
     if(!ctx || !role) return;
     const wolf=['werewolf','wolfcub','whitewolf'].includes(role.id);
-    const size=wolf?128:96;
+    const size=wolf?64:96;
     if(canvas.width!==size) {canvas.width=size;canvas.height=size;}
     ctx.imageSmoothingEnabled=false;
     if(wolf) {wolfPortrait(ctx,role.id);return;}

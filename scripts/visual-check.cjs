@@ -10,7 +10,7 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'masoi-pixel-'));
   const server=spawn(process.execPath,['server/index.js'],{cwd:path.resolve(__dirname,'..'),env:{...process.env,PORT:'0'},windowsHide:true});
   let browser,ws;
-  const watchdog=setTimeout(()=>{server.kill();browser?.kill();process.exitCode=1;},45000);
+  const watchdog=setTimeout(()=>{console.error('Browser smoke check timed out');server.kill();browser?.kill();process.exitCode=1;},180000);
   try {
     const port=await new Promise((resolve,reject)=>{server.stdout.on('data',d=>{const m=String(d).match(/localhost:(\d+)/);if(m)resolve(m[1]);});server.on('error',reject);server.on('exit',c=>reject(Error('Server exited '+c)));});
     browser=spawn(process.env.EDGE_PATH||'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',['--headless=new','--disable-gpu','--no-first-run','--remote-debugging-port=0','--user-data-dir='+path.join(dir,'profile'),'about:blank'],{windowsHide:true});
@@ -25,7 +25,9 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
       const c=(method,params)=>call(method,params,sessionId);
       const evaluate=async expression=>{const r=await c('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
       await c('Page.enable');await c('Runtime.enable');await c('Page.navigate',{url:'http://localhost:'+port});
-      for(let i=0;i<50;i++) {if(await evaluate("typeof state !== 'undefined' && socket.connected && Object.keys(roleCatalog).length > 0"))break;await pause(50);}
+      let ready=false;
+      for(let i=0;i<300;i++) {if(await evaluate("typeof state !== 'undefined' && socket.connected && Object.keys(roleCatalog).length === 16")){ready=true;break;}await pause(100);}
+      assert.ok(ready,'Page must load the socket and all 16 role definitions');
       return {c,evaluate};
     }
     async function snapshot(p,name,width,height=900) {
@@ -60,13 +62,23 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
     await snapshot(host,'day',1366);
     const preview=await page();
     await preview.c('Page.bringToFront');
+    await preview.evaluate(`(async () => {
+      for(const role of Object.values(roleCatalog)) {
+        window.villageArt.role(role);
+        const image=new Image();image.src='/assets/roles/'+role.id+'-retro.png';
+        await image.decode();
+        await new Promise(resolve=>setTimeout(resolve,30));
+        window.villageArt.role(role);
+        if($('role-portrait').width!==512) throw Error('Artwork not rendered: '+role.id);
+      }
+    })()`);
     await preview.evaluate("showReveal({role:roleCatalog.seer})");
     await pause(200);
     const frameA=await preview.evaluate("$('role-portrait').toDataURL()");
     await pause(450);
     const frameB=await preview.evaluate("$('role-portrait').toDataURL()");
-    assert.equal(frameA,frameB,'Original pixel portrait remains static');
-    await snapshot(preview,'original-seer',390);
+    assert.equal(frameA,frameB,'Role artwork remains static');
+    await snapshot(preview,'seer',390);
     for(const role of ['werewolf','wolfcub','whitewolf']) {
       await preview.evaluate(`showReveal({role:roleCatalog[${JSON.stringify(role)}]})`);
       await snapshot(preview,role,390);
@@ -84,7 +96,7 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
     })()`);
     fs.writeFileSync(path.join(dir,'all-role-portraits.png'),Buffer.from(sheet,'base64'));
     assert.equal(exceptions.length,0,JSON.stringify(exceptions));
-    console.log('PASS: game flow, original pixel portraits and reduced motion; no browser exceptions. Screenshots:',dir);
+    console.log('PASS: game flow, all 16 role assets loaded and rendered, reduced motion; no browser exceptions. Screenshots:',dir);
     await call('Browser.close');
   } finally {clearTimeout(watchdog);ws?.close();browser?.kill();server.kill();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

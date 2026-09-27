@@ -6,6 +6,18 @@
   let lastFrame = 0;
   let currentRole = null;
   let animationFrame = null;
+  const artworkRoles = new Set(['villager','werewolf','wolfcub','whitewolf','seer','guard','witch','hunter','cupid','lycan','cursed','elder','toughguy','prince','tanner','mason']);
+  const roleArtworks = new Map();
+  function artworkFor(id) {
+    if(!artworkRoles.has(id)) return null;
+    if(!roleArtworks.has(id)) {
+      const artwork = new Image();
+      roleArtworks.set(id,artwork);
+      artwork.onload = () => { if(currentRole?.id===id) portrait(currentRole); };
+      artwork.src = `/assets/roles/${id}-retro.png`;
+    }
+    return roleArtworks.get(id);
+  }
   const random = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
   function rect(ctx, color, x, y, w, h) {
     ctx.fillStyle = color;
@@ -216,9 +228,13 @@
     const ctx=canvas?.getContext('2d');
     if(!ctx || !role) return;
     const wolf=['werewolf','wolfcub','whitewolf'].includes(role.id);
-    const size=wolf?64:96;
+    const artwork=artworkFor(role.id);
+    const artworkReady=artwork?.complete && artwork.naturalWidth>0;
+    // 2x the 256 CSS pixel card is sufficient for high-density screens.
+    const size=artworkReady?512:wolf?64:96;
     if(canvas.width!==size) {canvas.width=size;canvas.height=size;}
     ctx.imageSmoothingEnabled=false;
+    if(artworkReady) {rect(ctx,'#14272b',0,0,size,size);ctx.drawImage(artwork,0,0,size,size);return;}
     if(wolf) {wolfPortrait(ctx,role.id);return;}
     rect(ctx,'#152a2c',0,0,96,96);
     for(let i=0;i<20;i++) rect(ctx,'#304843',random(i)*96,random(i+12)*96,2,2);
@@ -229,7 +245,6 @@
   }
   function redraw(time=0) {
     canvases.forEach(c=>{if(c.offsetParent!==null)paint(c,time);});
-    if(currentRole && document.getElementById('role-portrait')?.offsetParent!==null) portrait(currentRole,time);
   }
   function animate(now) {
     animationFrame=null;

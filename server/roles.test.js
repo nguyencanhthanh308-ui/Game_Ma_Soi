@@ -17,6 +17,47 @@ function setup(roles) {
 }
 function bite(g, p) { g.night = g._emptyNightActions(); g.night.wolfVictims = [p.id]; g.night.currentWolfVictim = p.id; g._resolveNight(io, noop); }
 
+test('empty first wolf round does not make the second bite healable', () => {
+  const [g,[wolf,witch,target]]=setup(['werewolf','witch','villager','villager','villager']);
+  g.phase=PHASE.NIGHT_WOLVES;g.night.remainingBites=2;
+  g._advanceFromTimer(io,noop);
+  assert.equal(g.night.wolfRound,2);
+  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:target.id});
+  g.phase=PHASE.NIGHT_WITCH;
+  assert.equal(g.getPhasePrompt(witch).canHeal,false);
+  assert.equal(g.recordAction(io,noop,witch.id,'witch_action',{heal:true}),undefined);
+  assert.equal(g.phase,PHASE.NIGHT_WITCH);
+  assert.equal(witch.hasUsedHeal,false);
+  g.recordAction(io,noop,witch.id,'witch_action',{});
+  assert.equal(target.alive,false);
+});
+
+test('witch heals only the first of two bites', () => {
+  const [g,[wolf,witch,a,b]]=setup(['werewolf','witch','villager','villager','villager']);
+  g.phase=PHASE.NIGHT_WOLVES;g.night.remainingBites=2;
+  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:a.id});
+  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:b.id});
+  g.phase=PHASE.NIGHT_WITCH;
+  assert.equal(g.getPhasePrompt(witch).victimName,a.name);
+  assert.equal(g.recordAction(io,noop,witch.id,'witch_action',{heal:true}),true);
+  assert.equal(a.alive,true);assert.equal(b.alive,false);
+});
+
+test('used witch potions do not end the turn; the available potion still works', () => {
+  for(const used of ['heal','poison']) {
+    const [g,[witch,target]]=setup(['witch','villager','werewolf','villager','villager']);
+    g.phase=PHASE.NIGHT_WITCH;
+    g.night.wolfVictims=[target.id];g.night.currentWolfVictim=target.id;
+    witch.hasUsedHeal=used==='heal';witch.hasUsedPoison=used==='poison';
+    const rejected=used==='heal'?{heal:true}:{poisonTargetId:target.id};
+    assert.equal(g.recordAction(io,noop,witch.id,'witch_action',rejected),undefined);
+    assert.equal(g.phase,PHASE.NIGHT_WITCH);
+    const accepted=used==='heal'?{poisonTargetId:target.id}:{heal:true};
+    assert.equal(g.recordAction(io,noop,witch.id,'witch_action',accepted),true);
+    assert.equal(target.alive,used==='poison');
+  }
+});
+
 test('guard can skip with null but cannot protect the same person on consecutive nights', () => {
   const [g,[guard,target]]=setup(['guard','villager','werewolf']);
   g.phase=PHASE.NIGHT_GUARD;
@@ -154,10 +195,10 @@ test('skip rejects wrong phases and stale day requests; incomplete vote preserve
   g._advanceFromTimer(io, noop);
   assert.equal(g.phase, PHASE.DAY_VOTE);
 });
-test('16 role cards have complete instructions; defaults valid for 6–20 players', () => {
+test('16 role cards have complete instructions; defaults valid for 3–20 players', () => {
   assert.equal(Object.keys(ROLE_INFO).length,16);
   for (const r of Object.values(ROLE_INFO)) for (const field of ['name','desc','play','win','team','icon']) assert.ok(r[field]);
-  for(let n=6;n<=20;n++) assert.deepEqual(validateRoleConfig(getDefaultRoleConfig(n),n),[]);
+  for(let n=3;n<=20;n++) assert.deepEqual(validateRoleConfig(getDefaultRoleConfig(n),n),[]);
   for(const value of [-1,1.5,Infinity,'2']) assert.ok(validateRoleConfig({werewolf:value,villager:4},6).length);
   assert.ok(validateRoleConfig(null,6).length);
 });

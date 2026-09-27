@@ -80,6 +80,7 @@ class Game {
       witchHeal: false,
       witchPoisonTarget: null,
       currentWolfVictim: null,
+      firstWolfVictim: null,
       wolfVictims: [],
       remainingBites: 1,
       wolfRound: 1,
@@ -389,6 +390,9 @@ class Game {
     }
 
     if (this.phase === PHASE.NIGHT_WITCH && type === 'witch_action' && player.role === 'witch') {
+      // Reject unavailable potions without consuming the witch's remaining turn.
+      if (payload.heal && (player.hasUsedHeal || !this.night.currentWolfVictim)) return;
+      if (payload.poisonTargetId && player.hasUsedPoison) return;
       if (payload.heal && !player.hasUsedHeal && this.night.currentWolfVictim) {
         this.night.witchHeal = true;
         player.hasUsedHeal = true;
@@ -425,6 +429,7 @@ class Game {
   _finishWolfRound(io, broadcastFn) {
     this._tallyWolfVotes();
     const victim = this.night.currentWolfVictim;
+    if (this.night.wolfRound === 1) this.night.firstWolfVictim = victim;
     if (victim) this.night.wolfVictims.push(victim);
     this.night.remainingBites -= 1;
     if (this.night.remainingBites > 0) {
@@ -432,7 +437,7 @@ class Game {
       this.night.wolfRound += 1;
       return this._goToPhase(io, broadcastFn, PHASE.NIGHT_WOLVES);
     }
-    this.night.currentWolfVictim = this.night.wolfVictims[0] || null;
+    this.night.currentWolfVictim = this.night.firstWolfVictim;
     return this._goToPhase(io, broadcastFn, PHASE.NIGHT_WHITEWOLF);
   }
 

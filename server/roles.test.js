@@ -17,6 +17,17 @@ function setup(roles) {
 }
 function bite(g, p) { g.night = g._emptyNightActions(); g.night.wolfVictims = [p.id]; g.night.currentWolfVictim = p.id; g._resolveNight(io, noop); }
 
+test('guard can skip with null but cannot protect the same person on consecutive nights', () => {
+  const [g,[guard,target]]=setup(['guard','villager','werewolf']);
+  g.phase=PHASE.NIGHT_GUARD;
+  assert.equal(g.recordAction(io,noop,guard.id,'guard_protect',{targetId:null}),true);
+  assert.equal(g.phase,PHASE.NIGHT_WOLVES);
+  g.phase=PHASE.NIGHT_GUARD;g.lastProtectedId=target.id;
+  assert.equal(g.recordAction(io,noop,guard.id,'guard_protect',{targetId:target.id}),undefined);
+  assert.equal(g.phase,PHASE.NIGHT_GUARD);
+  assert.equal(g.recordAction(io,noop,guard.id,'guard_protect',{targetId:null}),true);
+});
+
 test('reading roles waits for every connected player and resets for the next game', () => {
   const g = new Game('READY');
   const players = Array.from({length:3}, (_, i) => g.addPlayer('s'+i, 'P'+i));

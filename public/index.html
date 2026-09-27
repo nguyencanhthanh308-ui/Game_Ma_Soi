@@ -3,18 +3,36 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ma Sói Online</title>
+<title>Trăng Khuyết · Ma Sói Online</title>
+<meta name="theme-color" content="#0b1417" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <header class="site-header">
+    <div class="brand"><span class="brand-moon" aria-hidden="true">◒</span><div>TRĂNG KHUYẾT<small>MA SÓI ONLINE</small></div></div>
+    <span class="header-note">Một ngôi làng. Nhiều bí mật.</span>
+    <span class="edition">PIXEL EDITION <span aria-hidden="true">✦</span></span>
+  </header>
   <div id="app">
     <p id="connection-status" class="error-text hidden" role="status">Mất kết nối. Đang kết nối lại…</p>
 
     <!-- MAN HINH: NHAP TEN / TAO PHONG / VAO PHONG -->
     <section id="screen-home" class="screen active">
-      <div class="card">
-        <h1>🐺 Ma Sói Online</h1>
-        <p class="subtitle">Chơi Ma Sói cùng bạn bè — chat thảo luận ngay trong phòng, bầy Sói có kênh riêng vào ban đêm.</p>
+      <div class="home-world">
+        <p class="eyebrow"><span class="status-dot"></span> GAME SUY LUẬN CÙNG BẠN BÈ</p>
+        <h1>Khi đêm xuống,<br>ai là <em>Sói?</em></h1>
+        <p class="world-intro">Giữa những gương mặt quen thuộc, một bí mật đang ẩn mình.<br class="desktop-break"> Thắp lửa, gọi bạn bè và bước vào ngôi làng.</p>
+        <div class="village-frame home-village">
+          <div class="scene-caption"><span>NGÔI LÀNG TRĂNG KHUYẾT</span><span>ĐÊM ĐANG XUỐNG <span aria-hidden="true">☾</span></span></div>
+          <canvas class="village-canvas" width="480" height="280" role="img" aria-label="Minh họa pixel ngôi làng trong rừng, ánh trăng và lửa trại"></canvas>
+          <div class="scene-footer"><span><i class="ember-dot"></i> Có những bí mật chỉ đêm mới biết.</span><span aria-hidden="true">✦</span></div>
+        </div>
+        <div class="world-facts"><div><strong>16</strong><span>vai trò bí mật</span></div><div><strong>3–20</strong><span>người mỗi phòng</span></div><div><strong>Riêng tư</strong><span>lá bài của riêng bạn</span></div></div>
+      </div>
+      <div class="card entry-card">
+        <p class="eyebrow">CUỘC CHƠI BẮT ĐẦU TỪ ĐÂY</p>
+        <h2>Ghé vào làng.</h2>
+        <p class="subtitle">Chỉ cần một cái tên và những người bạn.<br>Không cần tài khoản.</p>
 
         <div class="tabs">
           <button class="tab-btn active" data-tab="create">Tạo phòng mới</button>
@@ -24,7 +42,7 @@
         <div id="tab-create" class="tab-content active">
           <label for="create-name">Tên của bạn</label>
           <input id="create-name" type="text" placeholder="Tên của bạn (chủ phòng)" maxlength="20" />
-          <button id="btn-create" class="btn-primary">Tạo phòng</button>
+          <button id="btn-create" class="btn-primary">Thắp lửa · Tạo phòng <span aria-hidden="true">↗</span></button>
         </div>
 
         <div id="tab-join" class="tab-content">
@@ -35,13 +53,19 @@
           <button id="btn-join" class="btn-primary">Tham gia</button>
         </div>
 
-        <p id="home-error" class="error-text"></p>
+        <p id="home-error" class="error-text" role="status"></p>
+        <div class="entry-divider"><span>LẦN ĐẦU GHÉ LÀNG?</span></div>
+        <details class="quick-guide"><summary>Cách chơi trong một phút <span aria-hidden="true">↗</span></summary><ol><li><strong>Nhận vai.</strong> Giữ bí mật lá bài và đọc năng lực của bạn.</li><li><strong>Đêm hành động.</strong> Sói đi săn, các vai thực hiện nhiệm vụ.</li><li><strong>Ngày suy luận.</strong> Thảo luận rồi bỏ phiếu tìm Sói.</li></ol><p>Chủ phòng chọn bộ vai trước khi chơi. Phòng 3–5 người phù hợp chơi thử.</p></details>
+        <p class="entry-footnote">Chơi ngay trên điện thoại hoặc máy tính.</p>
       </div>
     </section>
 
     <!-- MAN HINH: LOBBY -->
     <section id="screen-lobby" class="screen chat-layout">
-      <div class="card">
+      <div class="card lobby-card">
+        <p class="eyebrow">BÊN ÁNH LỬA TRẠI</p>
+        <h1>Chờ bạn ghé làng</h1>
+        <div class="village-frame compact-village"><canvas class="village-canvas" width="480" height="280" role="img" aria-label="Ngôi làng pixel trong lúc chờ người chơi"></canvas></div>
         <div class="room-header">
           <div>
             <div class="room-code-label">Mã phòng</div>
@@ -72,7 +96,9 @@
     <!-- MAN HINH: LO VAI TRO -->
     <section id="screen-reveal" class="screen">
       <div class="card center">
+        <p class="eyebrow">MỘT BÍ MẬT · CHỈ MÌNH BẠN BIẾT</p>
         <div id="role-card" class="role-card">
+          <canvas id="role-portrait" width="96" height="96" aria-hidden="true"></canvas>
           <div id="role-icon" class="role-icon">🎭</div>
           <h2 id="role-name">...</h2>
           <p id="role-team" class="tag"></p>
@@ -98,6 +124,7 @@
           </div>
           <button id="btn-toggle-role" class="btn-secondary small">Xem vai trò của tôi</button>
         </div>
+        <div class="village-frame game-village"><canvas class="village-canvas" width="480" height="280" role="img" aria-label="Khung cảnh ngôi làng thay đổi theo ngày và đêm"></canvas><span id="village-phase-caption" class="village-phase-caption">Ngôi làng Trăng Khuyết</span></div>
 
         <div id="phase-message" class="phase-message"></div>
 
@@ -130,7 +157,8 @@
   <div id="toast" class="toast hidden"></div>
 
   <section id="room-chat" class="room-chat hidden" aria-label="Trò chuyện trong phòng">
-    <h3>💬 Trò chuyện</h3>
+    <p class="eyebrow">NHỮNG LỜI THÌ THẦM</p>
+    <h3>Chuyện trong làng</h3>
     <div class="chat-channels" aria-label="Chọn kênh chat">
       <button id="chat-public" type="button" class="btn-secondary small" aria-pressed="true">Phòng chung</button>
       <button id="chat-wolves" type="button" class="btn-secondary small hidden" aria-pressed="false">🐺 Bầy Sói · riêng tư</button>
@@ -153,5 +181,6 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
   <script src="chat.js"></script>
+  <script src="village.js"></script>
 </body>
 </html>

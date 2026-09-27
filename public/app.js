@@ -54,6 +54,7 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
   $(id).classList.add('active');
   window.gameChat?.mount(id);
+  window.villageArt?.refresh();
 }
 
 function toast(msg) {
@@ -290,6 +291,7 @@ function renderLobby(gs) {
 
 function showReveal(privateState) {
   const role = privateState.role;
+  window.villageArt?.role(role);
   $('role-icon').textContent = role.icon;
   $('role-name').textContent = role.name;
   $('role-desc').textContent = role.desc;
@@ -621,6 +623,8 @@ function renderGameOver(gs) {
 // ---------- Socket events ----------
 
 socket.on('game_state', (gs) => {
+  window.villageArt?.update(gs);
+  $('village-phase-caption').textContent = gs.phase.startsWith('NIGHT_') ? `Đêm ${gs.nightNumber} · Ngôi làng đã ngủ` : gs.phase.startsWith('DAY_') ? `Ngày ${gs.dayNumber} · Làng thức giấc` : 'Ngôi làng Trăng Khuyết';
   if (actionContext(state.lastGameState) !== actionContext(gs)) {
     state.pendingAction = null;
     state.submittedForPhase = null;

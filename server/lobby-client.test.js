@@ -20,12 +20,14 @@ function client() {
     return nodes.get(id);
   }
   const events = {};
+  const actionAcks = [];
   let count = 1;
   let requests = 0;
   const context = vm.createContext({
     window: {},
     document: { getElementById: element, createElement: () => element(Symbol()), querySelectorAll: () => [], querySelector: () => element('screen-lobby') },
-    io: () => ({ on(name, cb) { events[name] = cb; }, emit(name, data, cb) {
+    io: () => ({ timeout() { return this; }, on(name, cb) { events[name] = cb; }, emit(name, data, cb) {
+      if (name === 'player_action') actionAcks.push(cb);
       if (name === 'get_role_suggestion') { requests++; cb({ ok: true, config: getDefaultRoleConfig(count), playerCount: count }); }
     } }),
     fetch: async () => ({ ok: true, json: async () => ROLE_INFO }),
@@ -37,7 +39,7 @@ function client() {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8'), context);
   vm.runInContext("state.playerId = 'host'", context);
   return {
-    nodes, context, events, get requests() { return requests; },
+    nodes, context, events, actionAcks, get requests() { return requests; },
     lobby(n) {
       count = n;
       events.game_state({ roomCode: 'TEST', phase: 'LOBBY', players: Array.from({ length: n }, (_, i) => ({ id: i ? 'p'+i : 'host', name: 'Player'+i, isHost: !i })) });
@@ -109,4 +111,36 @@ test('share link remains selectable when clipboard is unavailable or denied', as
   vm.runInContext("navigator.clipboard = {writeText: async () => {throw new Error('Denied')}}",c.context);
   await c.nodes.get('btn-share').handlers.click();
   assert.equal(c.nodes.get('share-url').value,'http://localhost:3000?room=ABCDE');
+});
+
+test('actions wait for acknowledgement, unlock on rejection/timeout and recover from reconnect', () => {
+  const c=client();
+  const gs={phase:'DAY_VOTE',dayNumber:1,nightNumber:1,actionRound:1,players:[{id:'host',isHost:true,alive:true}]};
+  const priv={role:null,actionContext:'DAY_VOTE:1:1:1',submitted:false,prompt:{action:'day_vote',targets:[{id:'a',name:'A'}]}};
+  c.events.game_state(gs);c.events.private_state(priv);
+  const send=()=>vm.runInContext("send('day_vote',{targetId:'a'})",c.context);
+  send();
+  assert.equal(vm.runInContext('state.submittedForPhase',c.context),null);
+  c.actionAcks.at(-1)(null,{ok:false,error:'Rate limited'});
+  assert.equal(vm.runInContext('state.pendingAction',c.context),null);
+  send();c.actionAcks.at(-1)(new Error('Timeout'));
+  assert.equal(vm.runInContext('state.submittedForPhase',c.context),null);
+  send();c.actionAcks.at(-1)(null,{ok:true});
+  assert.equal(vm.runInContext('state.submittedForPhase',c.context),'DAY_VOTE');
+  c.events.disconnect();
+  vm.runInContext("onJoinedRoom('TEST','host','Host',true,'token')",c.context);
+  c.events.game_state(gs);c.events.private_state(priv);
+  assert.equal(vm.runInContext('state.submittedForPhase',c.context),null);
+  c.events.private_state({...priv,submitted:true});
+  assert.equal(vm.runInContext('state.submittedForPhase',c.context),'DAY_VOTE');
+});
+
+test('late action acknowledgements cannot lock a new round', () => {
+  const c=client();
+  const gs={phase:'NIGHT_WOLVES',dayNumber:1,nightNumber:1,actionRound:1,players:[{id:'host',isHost:true,alive:true}]};
+  c.events.game_state(gs);c.events.private_state({role:null,prompt:{action:'wolf_vote',targets:[{id:'a',name:'A'}]}});
+  vm.runInContext("send('wolf_vote',{targetId:'a'})",c.context);
+  c.events.game_state({...gs,actionRound:2});
+  c.actionAcks.at(-1)(null,{ok:true});
+  assert.equal(vm.runInContext('state.submittedForPhase',c.context),null);
 });

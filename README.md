@@ -1,6 +1,7 @@
 # 🐺 Ma Sói Online
 
 Web app quản trò ảo cho trò chơi Ma Sói (Werewolf), chơi real-time qua Socket.io.
+Giao diện **Trăng Khuyết · Pixel Edition**: tranh làng vẽ bằng Canvas, chuyển cảnh theo ngày/đêm và thẻ nhân vật pixel. Không cần tải thư viện 3D hay ảnh từ dịch vụ bên ngoài; tôn trọng tùy chọn giảm chuyển động của thiết bị.
 Thiết kế cho khoảng **12–15 người chơi**, tối đa 20 người. Có thể bắt đầu từ 3 người với cấu hình hợp lệ (ít nhất 1 Sói, số Sói ít hơn số Dân); phòng 3–5 người phù hợp chơi thử, chưa được kiểm chứng cân bằng.
 
 - Sau khi chia vai, tất cả người chơi phải xác nhận đã đọc vai và đang kết nối thì đêm đầu mới bắt đầu. Không có đồng hồ trong lúc đọc vai. Chủ phòng có thể hủy chia vai để về sảnh nếu có người không thể tiếp tục.
@@ -100,6 +101,12 @@ Web này là 1 server Node.js thông thường (Express + Socket.io), có thể 
 - Mỗi kết nối có tối đa 30 thao tác tích lũy, phục hồi 10 thao tác/giây. Thao tác sai hoặc lặp lại không làm đổi trạng thái sẽ không phát lại dữ liệu cả phòng.
 - Tạo/vào phòng được giới hạn thêm theo địa chỉ kết nối: tối đa 60 lượt tích lũy, phục hồi 2 lượt/giây. Khi dùng reverse proxy, giới hạn này có thể được dùng chung cho các kết nối qua proxy; cần tính đến điều này khi triển khai cho nhiều nhóm.
 - Phòng đang chơi mà không còn ai kết nối được giữ tối đa 5 phút. Có người vào lại trước thời hạn thì hủy lịch xóa. Hết thời hạn, phòng và bộ đếm giờ bị dọn; người chơi cần tạo phòng mới. Sảnh chờ rỗng vẫn được xóa ngay.
+- Nếu chủ phòng mất kết nối quá 30 giây, quyền chủ phòng chuyển sang một người đang online. Chủ mới có thể hủy chia vai để về sảnh; chủ cũ vào lại vẫn giữ vai của mình nhưng không tự lấy lại quyền chủ phòng.
+- Lựa chọn chỉ hiển thị đã gửi sau khi server xác nhận. Khi bị từ chối hoặc chờ quá 5 giây, có thể thử lại; khi kết nối lại, trạng thái bỏ phiếu được lấy từ server.
+
+### Kiểm tra giao diện
+
+`node scripts/visual-check.cjs` chạy Edge headless đã cài trên Windows, kiểm tra độ rộng 320/390/1366 px và một ván ba người qua luồng tạo phòng, đọc vai, xác nhận sẵn sàng, Sói hành động. Ảnh chụp lưu vào thư mục tạm được in ra. Có thể đặt `EDGE_PATH` nếu Edge ở đường dẫn khác. Chạy `npm test` cho bộ kiểm tra logic và Socket.IO.
 
 ## Cấu trúc code
 

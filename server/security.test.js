@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { TokenBucket, RoomCleanup } = require('./Security');
+const { TokenBucket, RoomCleanup, HostRecovery } = require('./Security');
 const { Game, PHASE } = require('./Game');
 const { validateRoleConfig } = require('./roles');
 
@@ -22,6 +22,21 @@ test('rate limit bounds bursts and recovers without accumulating unlimited credi
   assert.equal(bucket.take(),false);
   now = 100000;
   assert.deepEqual(Array.from({length:4}, () => bucket.take()),[true,true,true,false]);
+});
+
+test('host recovery waits 30 seconds, cancels on return and transfers once', () => {
+  const game=new Game('HOST');const host=game.addPlayer('host','Host');const guest=game.addPlayer('guest','Guest');
+  game.phase=PHASE.ROLE_REVEAL;
+  const jobs=new Map();let seq=0,broadcasts=0;
+  const recovery=new HostRecovery(new Map([['HOST',game]]),()=>broadcasts++,{
+    schedule(fn,ms){assert.equal(ms,30000);jobs.set(++seq,fn);return seq;},cancel(id){jobs.delete(id);},now:()=>0,
+  });
+  game.removePlayerBySocket('host');recovery.update(game);recovery.update(game);
+  assert.equal(jobs.size,1);assert.equal(host.isHost,true);
+  game.reconnectByName('return','Host');recovery.update(game);assert.equal(jobs.size,0);
+  game.removePlayerBySocket('return');recovery.update(game);jobs.values().next().value();
+  assert.equal(game.hostId,guest.id);assert.equal(host.isHost,false);assert.equal(guest.isHost,true);assert.equal(broadcasts,1);
+  game.reconnectByName('return2','Host');recovery.update(game);assert.equal(game.hostId,guest.id);
 });
 
 test('no-op, duplicate and out-of-phase actions do not broadcast', () => {

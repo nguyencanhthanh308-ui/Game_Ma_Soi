@@ -45,7 +45,8 @@ test('real server deals all 16 roles privately, sends descriptions and restarts'
   await new Promise(resolve=>setTimeout(resolve,50));
   assert.equal(host.events.filter(e=>e[0]==='game_state').at(-1)[1].phase,'ROLE_REVEAL');
   assert.equal(host.events.filter(e=>e[0]==='game_state').at(-1)[1].phaseEndsAt,null);
-  for (const c of clients) c.ws.send('42'+JSON.stringify(['player_action',{type:'ready',payload:{}}]));
+  assert.equal((await host.emit('player_action',{type:'ready',payload:{},actionContext:'LOBBY:0:0:1'})).ok,false);
+  for (const c of clients) assert.equal((await c.emit('player_action',{type:'ready',payload:{},actionContext:'ROLE_REVEAL:0:0:1'})).ok,true);
   await new Promise(resolve=>setTimeout(resolve,100));
   const assigned=[];
   for(const c of clients){

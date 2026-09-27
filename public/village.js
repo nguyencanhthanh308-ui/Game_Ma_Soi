@@ -136,6 +136,69 @@
     }
     ctx.globalAlpha=1;
   }
+  function wolfPortrait(ctx, id, time) {
+    const white=id==='whitewolf', cub=id==='wolfcub';
+    const dark=white?'#526d82':cub?'#443638':'#192934';
+    const fur=white?'#b6cbd4':cub?'#9b8270':'#526878';
+    const light=white?'#e6ece4':cub?'#cead85':'#91a4ad';
+    const mid=white?'#87a9bf':cub?'#76625b':'#354956';
+    const eye=white?'#92e3ed':cub?'#f3cf7d':'#ffbc64';
+    rect(ctx,white?'#132633':'#111d27',0,0,96,96);
+    // The moon and layered pines frame a genuine animal silhouette.
+    ctx.fillStyle=white?'#597c8b':'#344b53';ctx.beginPath();ctx.arc(52,38,30,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=white?'#a1c1cc':'#94a89d';ctx.beginPath();ctx.arc(64,25,15,0,Math.PI*2);ctx.fill();
+    rect(ctx,white?'#85a7b7':'#738c84',67,19,5,3);rect(ctx,white?'#85a7b7':'#738c84',61,30,4,3);
+    for(let i=0;i<7;i++)pine(ctx,i*17-2,93,32+random(i)*24,'#0b1c23');
+    const breath=Math.round(Math.sin(time*1.7));
+    ctx.save();ctx.translate(0,breath);
+    // Broad sloping shoulders, ragged mane and chest: no human torso or clothing.
+    poly(ctx,dark,[[6,96],[10,78],[22,67],[19,59],[31,62],[37,54],[61,54],[69,62],[78,57],[75,69],[87,78],[94,96]]);
+    poly(ctx,fur,[[12,96],[15,81],[27,71],[30,60],[43,61],[63,58],[71,74],[82,80],[87,96]]);
+    poly(ctx,mid,[[7,96],[15,77],[27,70],[23,79],[31,78],[25,87],[30,86],[26,96]]);
+    poly(ctx,mid,[[89,96],[82,77],[67,68],[73,80],[65,78],[72,89],[65,85],[72,96]]);
+    poly(ctx,light,[[31,65],[44,62],[61,64],[66,75],[60,72],[60,81],[55,78],[51,91],[46,84],[42,91],[37,79],[33,83],[34,72],[29,75]]);
+    // Long, triangular ears and irregular cheek fur establish the wolf at small size.
+    poly(ctx,dark,[[20,9],[35,22],[43,20],[56,21],[65,17],[79,7],[76,34],[82,48],[76,47],[83,60],[71,57],[72,66],[60,64],[49,71],[37,65],[25,66],[27,58],[16,61],[23,49],[16,48],[22,34]]);
+    poly(ctx,fur,[[23,13],[35,26],[44,23],[57,25],[67,23],[75,12],[72,37],[77,47],[70,45],[76,56],[66,53],[66,61],[55,64],[45,65],[32,59],[33,54],[23,57],[28,46],[23,46],[27,36]]);
+    poly(ctx,light,[[24,15],[32,25],[29,31]]);
+    poly(ctx,light,[[73,14],[69,32],[64,27]]);
+    poly(ctx,white?'#6d8999':'#463a43',[[26,19],[31,26],[29,28]]);
+    poly(ctx,white?'#6d8999':'#463a43',[[71,19],[69,28],[66,26]]);
+    // Faceted fur is built in layers, with a central brow and recessed eyes.
+    poly(ctx,mid,[[31,30],[41,26],[48,30],[55,27],[68,29],[66,37],[73,43],[61,47],[54,43],[48,48],[42,43],[30,48],[24,43],[32,37]]);
+    poly(ctx,light,[[38,26],[46,24],[54,26],[50,35],[48,40],[44,33]]);
+    poly(ctx,dark,[[27,37],[40,40],[42,46],[30,45]]);
+    poly(ctx,dark,[[54,41],[68,37],[65,45],[53,47]]);
+    const blink=time%5.5>5.3;
+    if(!blink) {
+      poly(ctx,eye,cub?[[29,39],[38,40],[38,44],[31,44]]:[[29,40],[39,42],[36,44],[31,43]]);
+      poly(ctx,eye,cub?[[56,40],[66,39],[64,44],[56,44]]:[[56,42],[66,40],[64,43],[58,44]]);
+      rect(ctx,'#17232b',cub?34:34,41,1,cub?3:2);rect(ctx,'#17232b',60,41,1,cub?3:2);
+    }
+    // Projecting muzzle, nose, open jaw and ivory fangs.
+    poly(ctx,light,[[40,43],[49,40],[56,45],[60,54],[56,59],[42,59],[36,53]]);
+    poly(ctx,fur,[[49,42],[55,46],[58,53],[51,54],[48,50]]);
+    poly(ctx,'#09151e',[[42,50],[54,50],[53,54],[48,57],[43,54]]);
+    rect(ctx,white?'#7593a2':'#647d86',44,50,7,1);
+    poly(ctx,'#101a22',[[35,54],[42,57],[49,59],[56,56],[62,53],[59,63],[50,67],[40,63]]);
+    poly(ctx,white?'#78919c':'#74505a',[[43,62],[54,62],[51,65],[46,65]]);
+    if(!cub){poly(ctx,'#f4ead2',[[37,55],[41,57],[40,63]]);poly(ctx,'#f4ead2',[[56,57],[60,55],[57,63]]);}
+    else {rect(ctx,'#f4ead2',40,58,2,3);rect(ctx,'#f4ead2',55,58,2,3);}
+    poly(ctx,light,[[39,64],[48,68],[58,64],[53,71],[47,73],[43,70]]);
+    // Fine fur tufts keep the illustration detailed without smooth vector gradients.
+    for(const [x,y] of [[26,34],[29,50],[22,55],[65,50],[69,54],[20,81],[75,84],[37,74],[57,74]]) {
+      rect(ctx,light,x,y,3,1);rect(ctx,mid,x+1,y+2,2,2);
+    }
+    if(!cub && !white){rect(ctx,'#b5a392',63,29,1,6);rect(ctx,'#b5a392',61,31,1,5);}
+    ctx.restore();
+    for(let i=0;i<9;i++) {
+      const y=(92+i*17-time*(white?4:7))%96;
+      ctx.globalAlpha=.3+random(i)*.4;
+      rect(ctx,white?'#c5e6e9':'#d69d67',5+random(i+13)*85,y,1,i%3===0?2:1);
+    }
+    ctx.globalAlpha=1;
+  }
+
   function portrait(role, time=0) {
     const canvas=document.getElementById('role-portrait');
     const ctx=canvas?.getContext('2d');
@@ -144,6 +207,7 @@
     for(let i=0;i<20;i++) rect(ctx,'#304843',random(i)*96,random(i+12)*96,2,2);
     const id=role.id;
     const wolf=['werewolf','wolfcub','whitewolf'].includes(id);
+    if(wolf) {wolfPortrait(ctx,id,time);return;}
     const palettes={werewolf:['#587278','#ecac62'],wolfcub:['#8d7965','#efc78b'],whitewolf:['#c4d8d7','#cbeaf4'],seer:['#8b7d9d','#c5a0eb'],witch:['#628168','#a7d783'],guard:['#658c99','#a6d5dd'],hunter:['#7f8760','#d1bc85'],cupid:['#b97888','#f1a6b7'],lycan:['#85777e','#afb6d6'],cursed:['#6f5969','#cf8299'],elder:['#83916a','#c0d392'],toughguy:['#a07d62','#e5be8b'],prince:['#8d718c','#f0d18a'],tanner:['#977367','#d8b698'],mason:['#6a8b9a','#b0d2dd'],villager:['#b19860','#e7c88b']};
     const [coat,accent]=palettes[id]||palettes.villager;
     // Slow particles and a dim aura, never rapid flashing.
@@ -215,6 +279,7 @@
     const changed=role?.id!==currentRole?.id;
     currentRole=role;
     if(!role) return;
+    document.getElementById('role-portrait')?.style.setProperty('--portrait-frame',role.id==='whitewolf'?'#aaceda':role.id==='werewolf'?'#c58c62':role.id==='wolfcub'?'#c6ab7e':'#a08855');
     portrait(role);
     if(changed && !reducedMotion.matches) {
       revealAnimation?.cancel();

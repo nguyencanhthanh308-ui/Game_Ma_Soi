@@ -10,6 +10,9 @@ Một ngôi làng để nhóm bạn bước vào chơi Ma Sói ngay trên trình
 
 Không sao chép hình ảnh, nhân vật hoặc logo của các game tham khảo. Làng, nhà, cây, lửa trại và nhân vật được vẽ riêng bằng Canvas trong village.js.
 
+### Cập nhật chân dung Sói
+Tham khảo thêm [Armello — Thane và các anh hùng](https://steamcommunity.com/sharedfiles/filedetails/?id=375302472), [Wolvesville Classic](https://apps.apple.com/br/app/wolvesville-classic/id1322989325) và [Werewolves Within của Ubisoft](https://news.ubisoft.com/en-us/article/7iqxSHxiM3AnddCMXWWQSf/werewolves-within-available-now). Hướng vẽ riêng: chân dung thú cận cảnh, tai tam giác, mõm nhô, nanh, bờm lông nhiều lớp; không dùng lại thân người với tai Sói. Sói thường xám thép/mắt hổ phách, Sói con nâu/mắt lớn/nanh nhỏ, Sói trắng bạc/xanh băng. Chuyển động nhịp thở, chớp mắt và hạt sáng hoặc tuyết; giữ chế độ reduced motion.
+
 ## Định hướng
 Chọn 2D pixel với các lớp rừng, đồi, nhà và cây tiền cảnh tạo chiều sâu. Không dùng WebGL/3D thực. Chuyển động chỉ ở lửa, khói và đom đóm; dừng chuyển động nếu thiết bị yêu cầu reduced motion. Không tải ảnh hoặc font từ mạng.
 

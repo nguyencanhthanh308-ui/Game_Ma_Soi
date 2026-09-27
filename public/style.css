@@ -290,7 +290,7 @@ input::placeholder { color:#778e87; font-size:12px; }
 .chat-quote,.chat-reply-preview { background:#1b2c26; }
 .toast { background:#243b32; border-color:#637252; border-radius:3px; }
 #screen-reveal .card { max-width:500px; border-top:2px solid var(--accent-2); }
-#role-portrait { width:160px; height:160px; image-rendering:pixelated; margin:6px auto 20px; border:4px double #a08855; background:#142627; box-shadow:0 0 45px #d8b16c0d; }
+#role-portrait { width:min(224px, 65vw); height:auto; aspect-ratio:1; image-rendering:pixelated; margin:6px auto 24px; border:4px double var(--portrait-frame,#a08855); outline:1px solid #d4bb7022; outline-offset:6px; background:#142627; box-shadow:0 12px 35px #0005,0 0 45px #d8b16c0d; }
 #role-icon { display:none; }
 #role-name { font-size:32px; font-weight:400; margin:0 0 12px; }
 .role-card { border-top:0; padding-top:0; }

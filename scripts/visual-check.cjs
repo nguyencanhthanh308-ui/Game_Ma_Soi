@@ -67,6 +67,10 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
     const frameB=await preview.evaluate("$('role-portrait').toDataURL()");
     assert.notEqual(frameA,frameB,'Portrait should animate while visible');
     await snapshot(preview,'animated-seer',390);
+    for(const role of ['werewolf','wolfcub','whitewolf']) {
+      await preview.evaluate(`showReveal({role:roleCatalog[${JSON.stringify(role)}]})`);
+      await snapshot(preview,role,390);
+    }
     await preview.c('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
     await pause(150);
     const stillA=await preview.evaluate("$('role-portrait').toDataURL()");

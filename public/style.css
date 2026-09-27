@@ -290,7 +290,7 @@ input::placeholder { color:#778e87; font-size:12px; }
 .chat-quote,.chat-reply-preview { background:#1b2c26; }
 .toast { background:#243b32; border-color:#637252; border-radius:3px; }
 #screen-reveal .card { max-width:500px; border-top:2px solid var(--accent-2); }
-#role-portrait { width:160px; height:160px; image-rendering:pixelated; margin:6px auto 20px; border:4px double #a08855; background:#142627; box-shadow:0 0 45px #d8b16c0d; }
+#role-portrait { box-sizing:content-box; width:256px; height:256px; max-width:100%; object-fit:contain; image-rendering:pixelated; margin:6px auto 20px; outline:1px solid #a08855; outline-offset:4px; background:#142627; box-shadow:0 0 45px #d8b16c0d; }
 #role-icon { display:none; }
 #role-name { font-size:32px; font-weight:400; margin:0 0 12px; }
 .role-card { border-top:0; padding-top:0; }
@@ -330,4 +330,31 @@ input::placeholder { color:#778e87; font-size:12px; }
   .role-config-grid .stepper { gap:2px; } .role-config-grid { column-gap:6px; }
 }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; animation:none!important; } }
+
+/* Local Vietnamese-capable fonts: no network font load or mixed serif glyphs. */
+body { font-family:'Segoe UI',Tahoma,Arial,sans-serif; }
+h1, #role-name, .brand, .entry-card h2, .room-chat h3, .world-facts strong {
+  font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+  font-weight:600;
+  letter-spacing:normal;
+  line-height:1.3;
+}
+.brand { letter-spacing:.06em; }
+.brand small, .edition, .eyebrow, .scene-caption, .scene-footer,
+.entry-divider span, .village-phase-caption {
+  font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+  font-weight:600;
+  letter-spacing:.08em;
+  line-height:1.7;
+}
+.eyebrow, .entry-card .eyebrow, .room-chat > .eyebrow { font-size:11px; }
+.brand small { font-size:10px; letter-spacing:.12em; }
+.scene-caption, .scene-footer { font-size:10px; }
+#role-name { font-size:32px; line-height:1.4; }
+.role-card h3 { font-size:12px; letter-spacing:.07em; }
+.role-card p { font-size:15px; line-height:1.75; }
+#screen-reveal .card > .eyebrow { letter-spacing:.1em; }
+@media (max-width:360px) {
+  #role-portrait { width:224px; height:224px; }
+}
 

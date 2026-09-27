@@ -65,8 +65,8 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
     const frameA=await preview.evaluate("$('role-portrait').toDataURL()");
     await pause(450);
     const frameB=await preview.evaluate("$('role-portrait').toDataURL()");
-    assert.notEqual(frameA,frameB,'Portrait should animate while visible');
-    await snapshot(preview,'animated-seer',390);
+    assert.equal(frameA,frameB,'Original pixel portrait remains static');
+    await snapshot(preview,'original-seer',390);
     for(const role of ['werewolf','wolfcub','whitewolf']) {
       await preview.evaluate(`showReveal({role:roleCatalog[${JSON.stringify(role)}]})`);
       await snapshot(preview,role,390);
@@ -84,7 +84,7 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
     })()`);
     fs.writeFileSync(path.join(dir,'all-role-portraits.png'),Buffer.from(sheet,'base64'));
     assert.equal(exceptions.length,0,JSON.stringify(exceptions));
-    console.log('PASS: game flow, animated portraits, reduced motion and 16 role drawings; no browser exceptions. Screenshots:',dir);
+    console.log('PASS: game flow, original pixel portraits and reduced motion; no browser exceptions. Screenshots:',dir);
     await call('Browser.close');
   } finally {clearTimeout(watchdog);ws?.close();browser?.kill();server.kill();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

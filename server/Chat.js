@@ -14,6 +14,7 @@ class Chat {
   permissions(game, player) {
     const active = !['LOBBY', 'GAME_OVER'].includes(game.phase);
     const wolves = active && player.alive && isWolfTeam(player.role);
+    const dead = !player.alive;
     return {
       public: {
         canRead: true,
@@ -26,6 +27,11 @@ class Chat {
         canSend: wolves && game.phase.startsWith('NIGHT_'),
         reason: 'Chat riêng của bầy Sói mở vào ban đêm.',
       },
+      dead: {
+        canRead: dead,
+        canSend: dead,
+        reason: 'Kênh Âm phủ chỉ dành cho người chơi đã mất, có thể trò chuyện bất cứ lúc nào.',
+      },
     };
   }
 
@@ -33,8 +39,12 @@ class Chat {
     const permissions = this.permissions(game, player);
     return {
       permissions,
-      messages: this.messages.filter(m => m.channel === 'public' ||
-        (permissions.wolves.canRead && m.audience.includes(player.id))).map(({ audience, replyAudience, ...message }) => {
+      messages: this.messages.filter(m => {
+        if (m.channel === 'public') return true;
+        if (m.channel === 'wolves') return permissions.wolves.canRead && m.audience.includes(player.id);
+        if (m.channel === 'dead') return permissions.dead.canRead && m.audience.includes(player.id);
+        return false;
+      }).map(({ audience, replyAudience, ...message }) => {
           if (replyAudience && !replyAudience.includes(player.id)) return { ...message, replyTo: null };
           return message;
         }),
@@ -42,7 +52,7 @@ class Chat {
   }
 
   send(game, player, data, now = Date.now()) {
-    if (!data || !['public', 'wolves'].includes(data.channel) || typeof data.text !== 'string') {
+    if (!data || !['public', 'wolves', 'dead'].includes(data.channel) || typeof data.text !== 'string') {
       return { ok: false, error: 'Tin nhắn không hợp lệ.' };
     }
     const permission = this.permissions(game, player)[data.channel];
@@ -61,6 +71,8 @@ class Chat {
     this.lastSent.set(player.id, now);
     const audience = data.channel === 'wolves'
       ? [...game.players.values()].filter(p => p.alive && isWolfTeam(p.role)).map(p => p.id)
+      : data.channel === 'dead'
+      ? [...game.players.values()].filter(p => !p.alive).map(p => p.id)
       : null;
     const message = {
       id: this.nextId++, channel: data.channel, playerId: player.id,

@@ -76,3 +76,28 @@ test('chat validates input, derives author on server, limits spam and history, c
   assert.equal(chat.snapshot(game,wolf).messages.length,100);
   chat.reset();assert.equal(chat.snapshot(game,wolf).messages.length,0);
 });
+
+test('dead channel is only visible to dead players, joins gradually and never leaks to the living', () => {
+  const { chat, game, players: [wolf, , , villager, cursed] } = setup();
+  // Chua ai chet: khong ai duoc doc/gui Am phu
+  assert.equal(chat.permissions(game, wolf).dead.canRead, false);
+  assert.equal(chat.send(game, wolf, { channel: 'dead', text: 'Toi con song ma' }).ok, false);
+
+  villager.alive = false;
+  assert.ok(chat.send(game, villager, { channel: 'dead', text: 'Chao mung den am phu' }, 1000).ok);
+  assert.equal(chat.snapshot(game, villager).messages.length, 1);
+  // Nguoi con song khong doc duoc, ke ca Soi
+  assert.equal(chat.snapshot(game, wolf).messages.filter(m => m.channel === 'dead').length, 0);
+  assert.equal(chat.permissions(game, wolf).dead.canSend, false);
+
+  // Wolf chet sau -> tham gia duoc kenh nhung khong thay tin nhan cu (audience chot tai thoi diem gui)
+  wolf.alive = false;
+  assert.equal(chat.snapshot(game, wolf).messages.length, 0);
+  assert.ok(chat.send(game, wolf, { channel: 'dead', text: 'Toi moi den' }, 2000).ok);
+  assert.deepEqual(chat.snapshot(game, wolf).messages.map(m => m.text), ['Toi moi den']);
+  assert.deepEqual(chat.snapshot(game, villager).messages.map(m => m.text), ['Chao mung den am phu', 'Toi moi den']);
+
+  // Nguoi con song khac (cursed) van khong thay gi ca du game da qua nhieu pha
+  game.phase = 'GAME_OVER';
+  assert.equal(chat.snapshot(game, cursed).messages.filter(m => m.channel === 'dead').length, 0);
+});

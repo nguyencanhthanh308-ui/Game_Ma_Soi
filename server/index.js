@@ -38,7 +38,7 @@ function broadcastRoom(io, game) {
   // Gui thong tin rieng tu (vai tro, goi y hanh dong) cho tung nguoi choi con ket noi
   for (const player of game.players.values()) {
     if (!player.connected) continue;
-    const payload = { role: null, prompt: null };
+    const payload = { role: null, prompt: null, seerResults: player.role === 'seer' ? (player.seerResults || []) : [] };
     if (player.role) {
       const info = ROLE_INFO[player.role];
       payload.role = { ...info };
@@ -119,7 +119,6 @@ io.on('connection', (socket) => {
     if (!game) return cb && cb({ ok: false, error: 'Phong khong ton tai' });
     const player = game.players.get(socket.data.playerId);
     if (!player || !player.isHost) return cb && cb({ ok: false, error: 'Chi chu phong moi duoc bat dau game' });
-    if (game.players.size < 6) return cb && cb({ ok: false, error: 'Can it nhat 6 nguoi choi de bat dau' });
 
     const result = game.startGame(roleConfig, durations);
     if (!result.ok) return cb && cb({ ok: false, error: result.errors.join('; ') });

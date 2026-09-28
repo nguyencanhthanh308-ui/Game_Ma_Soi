@@ -1,7 +1,7 @@
 # 🐺 Ma Sói Online
 
 Web app quản trò ảo cho trò chơi Ma Sói (Werewolf), chơi real-time qua Socket.io.
-Thiết kế cho khoảng **12–15 người chơi** (hoạt động tốt từ 6 đến 20 người).
+Thiết kế cho khoảng **12–15 người chơi**, cho phép bắt đầu từ **1 đến 20 người**. Phòng 1–2 người dùng để thử thao tác; điều kiện thắng vẫn áp dụng nên ván có thể kết thúc rất nhanh. Phòng 3–5 người mặc định có 1 Sói, 1 Tiên tri và các Dân làng còn lại.
 
 ## Cách chơi
 
@@ -11,6 +11,7 @@ Thiết kế cho khoảng **12–15 người chơi** (hoạt động tốt từ 
 - Có thể dùng voice call ngoài web nếu muốn nói chuyện bằng giọng nói.
 - Web app đóng vai trò **quản trò ảo**: tự động chia vai trò riêng tư cho từng người, dẫn dắt các lượt đêm (Sói cắn, Tiên tri soi, Phù thủy cứu/độc, Bảo vệ, Sói trắng, Cupid...), đếm ngược tự động chuyển pha, tổng hợp bỏ phiếu ban ngày, và báo thắng thua cuối game.
 - Mỗi người chơi tự mở link trên điện thoại/máy tính riêng của mình.
+- Tiên tri chọn mục tiêu rồi bấm **Soi người đã chọn**. Kết quả được lưu riêng trong **Kết quả soi của bạn**, hiện cả sau khi kết nối lại và ở màn hình kết thúc; ván mới sẽ xóa lịch sử cũ.
 - Khi có người chết, thông báo chỉ hiện tên, không công khai vai. Bảng tổng kết cuối ván vẫn hiển thị toàn bộ vai; các thông tin đã biết trước đó (đồng đội Sói, Hoàng tử đã lộ diện) không thể thu hồi.
 - Trong thời gian thảo luận, mỗi người còn sống có nút **Bỏ qua ngày → Đêm tiếp theo**. Khi tất cả người còn sống đồng ý (bao gồm người tạm mất kết nối), ván chuyển thẳng sang đêm và không treo cổ ai. Nếu chưa đủ đồng ý, hết giờ vẫn chuyển sang bỏ phiếu như thường lệ.
 

@@ -48,7 +48,7 @@ test('lobby automatically replaces one-player setup with valid six-player roles'
   const c = client();
   await new Promise(resolve => setImmediate(resolve));
   c.lobby(1);
-  assert.equal(c.nodes.get('btn-start').disabled, true);
+  assert.equal(c.nodes.get('btn-start').disabled, false);
   c.lobby(6);
   assert.deepEqual(validateRoleConfig(c.config(), 6), []);
   assert.equal(c.nodes.get('btn-start').disabled, false);

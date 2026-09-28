@@ -188,6 +188,7 @@ class Game {
       p.hasUsedWhiteKill = false;
       p.hasUsedHeal = false;
       p.hasUsedPoison = false;
+      p.seerResults = [];
       p.biteCount = 0;
       p.doomedNight = null;
       p.revealedPrince = false;
@@ -355,11 +356,14 @@ class Game {
       this.night.seerTarget = payload.targetId || null;
       const target = this.players.get(payload.targetId);
       if (target) {
-        io.to(player.socketId).emit('seer_result', {
+        const result = {
+          nightNumber: this.nightNumber,
           targetId: target.id,
           targetName: target.name,
           isWolf: isWolfTeam(target.role) || target.role === 'lycan',
-        });
+        };
+        player.seerResults = [...(player.seerResults || []), result];
+        io.to(player.socketId).emit('seer_result', result);
       }
       this._goToPhase(io, broadcastFn, PHASE.NIGHT_WITCH);
       return;

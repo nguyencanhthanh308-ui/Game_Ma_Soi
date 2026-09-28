@@ -62,7 +62,7 @@ test('skip rejects wrong phases and stale day requests; incomplete vote preserve
 test('16 role cards have complete instructions; defaults valid for 6–20 players', () => {
   assert.equal(Object.keys(ROLE_INFO).length,16);
   for (const r of Object.values(ROLE_INFO)) for (const field of ['name','desc','play','win','team','icon']) assert.ok(r[field]);
-  for(let n=6;n<=20;n++) assert.deepEqual(validateRoleConfig(getDefaultRoleConfig(n),n),[]);
+  for(let n=1;n<=20;n++) assert.deepEqual(validateRoleConfig(getDefaultRoleConfig(n),n),[]);
   for(const value of [-1,1.5,Infinity,'2']) assert.ok(validateRoleConfig({werewolf:value,villager:4},6).length);
   assert.ok(validateRoleConfig(null,6).length);
 });
@@ -93,6 +93,19 @@ test('tanner wins on execution but not on bite', () => {
 test('lycan appears as wolf to seer', () => {
   const [g,[seer,target]]=setup(['seer','lycan']);g.phase=PHASE.NIGHT_SEER;let result;
   g.recordAction({to:()=>({emit:(_event,data)=>result=data})},noop,seer.id,'seer_check',{targetId:target.id});assert.equal(result.isWolf,true);
+});
+test('seer retains private results across phases and clears them for a new game', () => {
+  const [g,[seer,wolf,villager]]=setup(['seer','werewolf','villager']);
+  g.phase=PHASE.NIGHT_SEER;
+  g.recordAction(io,noop,seer.id,'seer_check',{targetId:wolf.id});
+  assert.equal(seer.seerResults[0].isWolf,true);
+  g.nightNumber=2;g.phase=PHASE.NIGHT_SEER;
+  g.recordAction(io,noop,seer.id,'seer_check',{targetId:villager.id});
+  assert.equal(seer.seerResults[1].isWolf,false);
+  assert.equal(seer.seerResults[1].nightNumber,2);
+  assert.ok(g.publicPlayerList().every(p=>!p.seerResults));
+  g.phase=PHASE.LOBBY;assert.ok(g.startGame(getDefaultRoleConfig(3)).ok);
+  assert.deepEqual(seer.seerResults,[]);
 });
 test('dead hunter can shoot; another player cannot take the shot', () => {
   const [g,[hunter,target,other]]=setup(['hunter','werewolf','villager']);g._applyDeaths(io,[hunter.id]);g.phase=PHASE.HUNTER_SHOT;

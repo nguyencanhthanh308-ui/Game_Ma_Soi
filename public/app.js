@@ -225,9 +225,8 @@ function renderRoleConfig() {
   });
   const sum = Object.values(state.roleConfig).reduce((a, b) => a + b, 0);
   $('role-config-error').textContent = !ROLE_STEP_ORDER.length ? 'Đang tải danh sách vai. Nếu chờ lâu, hãy khởi động lại server rồi tải lại trang.'
-    : total < 6 ? `Cần ít nhất 6 người để bắt đầu (hiện có ${total}).`
     : sum === total ? '' : `Tổng vai trò: ${sum} / ${total} người chơi. Bấm “Gợi ý lại theo số người” để cân bằng.`;
-  $('btn-start').disabled = !ROLE_STEP_ORDER.length || total < 6 || sum !== total;
+  $('btn-start').disabled = !ROLE_STEP_ORDER.length || sum !== total;
 }
 
 function renderLobby(gs) {
@@ -434,7 +433,7 @@ function renderActionArea(gs, priv) {
 
   const confirmBtn = document.createElement('button');
   confirmBtn.className = 'btn-primary';
-  confirmBtn.textContent = 'Xác nhận';
+  confirmBtn.textContent = prompt.action === 'seer_check' ? '🔮 Soi người đã chọn' : 'Xác nhận';
   confirmBtn.addEventListener('click', () => {
     if (prompt.action === 'cupid_choose') {
       if (state.selected.length !== 2) return toast('Chọn đủ 2 người.');
@@ -546,6 +545,7 @@ socket.on('game_state', (gs) => {
 });
 
 socket.on('private_state', (priv) => {
+  renderSeerResults(priv.seerResults || []);
   if (state.lastPrivate?.role && priv.role && state.lastPrivate.role.id !== priv.role.id) state.hasSeenReveal = false;
   state.lastPrivate = priv;
   if (priv.role && !state.hasSeenReveal && state.lastGameState && state.lastGameState.phase !== 'LOBBY' && state.lastGameState.phase !== 'GAME_OVER') {
@@ -558,5 +558,21 @@ socket.on('private_state', (priv) => {
 });
 
 socket.on('seer_result', (res) => {
+  const results = state.lastPrivate?.seerResults || [];
+  renderSeerResults([...results, res]);
   toast(`🔮 ${res.targetName} ${res.isWolf ? 'LÀ SÓI 🐺' : 'không phải là Sói'}`);
 });
+
+function renderSeerResults(results) {
+  for (const id of ['seer-results', 'seer-results-over']) {
+    const panel = $(id);
+    panel.classList.toggle('hidden', !results.length);
+    const list = $(id + '-list');
+    list.innerHTML = '';
+    for (const result of [...results].reverse()) {
+      const item = document.createElement('li');
+      item.textContent = `Đêm ${result.nightNumber}: ${result.targetName} — ${result.isWolf ? 'LÀ SÓI 🐺' : 'KHÔNG PHẢI SÓI'}`;
+      list.appendChild(item);
+    }
+  }
+}

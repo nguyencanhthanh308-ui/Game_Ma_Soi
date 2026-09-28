@@ -124,11 +124,24 @@
 
   <div id="toast" class="toast hidden"></div>
 
+  <section id="room-voice" class="room-voice hidden" aria-label="Voice chat trong phòng">
+    <h3>🎙️ Voice chat</h3>
+    <p id="voice-channel-label" class="voice-channel-label">🔇 Không có kênh voice lúc này</p>
+    <button id="btn-toggle-mic" class="btn-primary small">🎤 Bật mic</button>
+    <p id="voice-hint" class="hint-text"></p>
+    <ul id="voice-peer-list" class="voice-peer-list"></ul>
+    <div class="voice-settings">
+      <button id="btn-toggle-narrator" class="btn-secondary small" aria-pressed="true">🔊 Dẫn chuyện: Bật</button>
+      <button id="btn-toggle-music" class="btn-secondary small" aria-pressed="false">🎵 Nhạc nền: Tắt</button>
+    </div>
+  </section>
+
   <section id="room-chat" class="room-chat hidden" aria-label="Trò chuyện trong phòng">
     <h3>💬 Trò chuyện</h3>
     <div class="chat-channels" aria-label="Chọn kênh chat">
       <button id="chat-public" type="button" class="btn-secondary small" aria-pressed="true">Phòng chung</button>
       <button id="chat-wolves" type="button" class="btn-secondary small hidden" aria-pressed="false">🐺 Bầy Sói · riêng tư</button>
+      <button id="chat-dead" type="button" class="btn-secondary small hidden" aria-pressed="false">👻 Âm phủ · riêng tư</button>
     </div>
     <p id="chat-hint" class="hint-text"></p>
     <ol id="chat-messages" class="chat-messages" aria-label="Tin nhắn" aria-live="polite" aria-relevant="additions"></ol>
@@ -144,8 +157,13 @@
     <p id="chat-error" class="error-text" role="status"></p>
   </section>
 
+  <audio id="bgm-day" loop preload="none" src="sounds/bgm-day.mp3"></audio>
+  <audio id="bgm-night" loop preload="none" src="sounds/bgm-night.mp3"></audio>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
   <script src="chat.js"></script>
+  <script src="voice.js"></script>
+  <script src="audio.js"></script>
 </body>
 </html>

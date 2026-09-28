@@ -1,0 +1,8 @@
+# Werewolf retro reference revision
+
+Generated using built-in image_gen, using the user's supplied sprite as style reference.
+All 16 roles now use their matching `<role>-retro.png` asset. The previous
+`-v2.png` files are retained as earlier versions. See RETRO-PROMPTS.md for
+the other 15 generation prompts. Images load on demand and render without smoothing.
+
+Create a single original WEREWOLF GAME SPRITE closely matching the visual style of the user's most recent reference image: true low-resolution retro pixel art, chunky clean square pixels, limited palette of 10-14 colors, no tiny texture. One complete full-body black and dark charcoal werewolf in right-facing side/three-quarter view, hunched forward, thick spiky mane on back and head, long pale gray wolf muzzle, a LARGE white silver chest bib, small amber eye, bent digitigrade legs, long arms hanging forward, three white claws per hand and foot, thick tail curling to the left. Compact powerful feral monster silhouette. No clothing, no armor, no belt, no weapons. Character design roughly 64 pixels wide by 72 pixels tall on a 96x96 logical pixel canvas, enlarged by nearest neighbor into a square output; all pixels aligned to this coarse uniform grid. Strong flat pixel color clusters, one dark outline, only 3 shades per material. Background a SINGLE flat dark teal #14272b, optional simple flat pixel ground shadow. Entire character centered with generous 10% margins, no cropping. No title, no text, no typography, no watermark, no border, no UI. NOT detailed illustration, NOT realistic fur, NOT smooth painting, NOT 3D, NOT gradients, NOT antialiasing. The user's reference is style guidance only; make an original sprite with the same chunky readable retro look.

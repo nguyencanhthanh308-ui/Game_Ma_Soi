@@ -52,6 +52,7 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
   $(id).classList.add('active');
   window.gameChat?.mount(id);
+  window.gameVoice?.mount(id);
 }
 
 function toast(msg) {
@@ -512,6 +513,10 @@ socket.on('game_state', (gs) => {
   const prevPhase = state.lastGameState ? state.lastGameState.phase : null;
   state.lastGameState = gs;
 
+  // Ban ngay nen sang, ban dem nen toi + doc dan chuyen khi vua chuyen sang mot pha moi
+  document.documentElement?.classList?.toggle('theme-night', gs.phase.startsWith('NIGHT_'));
+  if (prevPhase !== gs.phase) window.gameAudio?.onPhaseChange(gs.phase);
+
   if (gs.phase === 'LOBBY') {
     state.lastPrivate = null;
     state.hasSeenReveal = false;
@@ -545,6 +550,7 @@ socket.on('game_state', (gs) => {
 });
 
 socket.on('private_state', (priv) => {
+  window.gameVoice?.syncVoiceChannel(priv);
   renderSeerResults(priv.seerResults || []);
   if (state.lastPrivate?.role && priv.role && state.lastPrivate.role.id !== priv.role.id) state.hasSeenReveal = false;
   state.lastPrivate = priv;

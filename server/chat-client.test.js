@@ -44,7 +44,9 @@ test('chat UI switches channels, renders text safely and removes wolf history af
   get('chat-messages').scrollTop = 0;
   const incoming = {id:3,channel:'public',name:'New',text:'Latest message',sentAt:3000};
   handlers.chat_state({permissions,messages:[...messages,incoming]});
-  assert.equal(get('chat-messages').scrollTop,900,'New messages must show the bottom even if previously scrolled up');
+  assert.equal(get('chat-messages').scrollTop,0,'New messages must preserve the position while reading history');
+  get('chat-latest').handlers.click();
+  assert.equal(get('chat-messages').scrollTop,900);
   assert.equal(get('#screen-game').children.length,1);
   assert.equal(get('chat-input').disabled,true);
   assert.equal(get('chat-messages').children[0].children[0].textContent,'<img onerror=alert(1)> (bạn)');

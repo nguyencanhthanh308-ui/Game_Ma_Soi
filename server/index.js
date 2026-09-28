@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const { Game, PHASE } = require('./Game');
 const { ROLE_INFO, isWolfTeam } = require('./roles');
 const { Chat } = require('./Chat');
+const { voiceChannelFor, voiceRoster } = require('./voice');
 const { randomUUID } = require('crypto');
 
 const app = express();
@@ -34,6 +35,7 @@ function generateRoomCode() {
 function broadcastRoom(io, game) {
   const publicState = game.publicState();
   io.to(game.roomCode).emit('game_state', publicState);
+  const voiceGroups = voiceRoster(game);
 
   // Gui thong tin rieng tu (vai tro, goi y hanh dong) cho tung nguoi choi con ket noi
   for (const player of game.players.values()) {
@@ -57,6 +59,9 @@ function broadcastRoom(io, game) {
     if (game.phase !== PHASE.LOBBY && game.phase !== PHASE.GAME_OVER) {
       payload.prompt = game.getPhasePrompt(player);
     }
+    const myVoiceChannel = voiceChannelFor(game, player);
+    payload.voiceChannel = myVoiceChannel;
+    payload.voicePeers = myVoiceChannel ? voiceGroups[myVoiceChannel].filter((p) => p.playerId !== player.id) : [];
     io.to(player.socketId).emit('private_state', payload);
     io.to(player.socketId).emit('chat_state', game.chat.snapshot(game, player));
   }
@@ -134,6 +139,21 @@ io.on('connection', (socket) => {
     if (!game) return;
     game.recordAction(io, () => broadcastRoom(io, game), socket.data.playerId, type, payload || {});
     broadcastRoom(io, game);
+  });
+
+  // Relay tin hieu WebRTC (offer/answer/ICE candidate) giua 2 nguoi choi trong cung mot kenh voice.
+  // Server khong xu ly noi dung am thanh, chi chuyen tiep goi tin bao mat theo playerId that (khong tin client).
+  socket.on('voice_signal', ({ toPlayerId, data }) => {
+    const game = rooms.get(socket.data.roomCode);
+    if (!game || !data) return;
+    const me = game.players.get(socket.data.playerId);
+    const target = game.players.get(toPlayerId);
+    if (!me || !me.connected || me.socketId !== socket.id || !target || !target.connected) return;
+    // Chi cho relay neu ca 2 dang cung o mot kenh voice hop le (chong gia mao ket noi ngoai y muon)
+    const myChannel = voiceChannelFor(game, me);
+    const targetChannel = voiceChannelFor(game, target);
+    if (!myChannel || myChannel !== targetChannel) return;
+    io.to(target.socketId).emit('voice_signal', { fromPlayerId: me.id, data });
   });
 
   socket.on('chat_send', (data, cb) => {

@@ -174,4 +174,4 @@
     render();
   });
   window.gameChat = { mount };
-})();
+})()

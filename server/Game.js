@@ -76,6 +76,7 @@ class Game {
       whiteWolfTarget: null, // null = chua quyet dinh, 'skip' = bo qua
       seerTarget: null,
       witchHeal: false,
+      witchHealDecided: false,
       witchPoisonTarget: null,
       currentWolfVictim: null,
       wolfVictims: [],
@@ -370,10 +371,18 @@ class Game {
     }
 
     if (this.phase === PHASE.NIGHT_WITCH && type === 'witch_action' && player.role === 'witch') {
-      if (payload.heal && !player.hasUsedHeal && this.night.currentWolfVictim) {
-        this.night.witchHeal = true;
-        player.hasUsedHeal = true;
+      if (prompt.step === 'heal') {
+        if (typeof payload.heal !== 'boolean' || payload.poisonTargetId) return;
+        this.night.witchHealDecided = true;
+        if (payload.heal && prompt.canHeal) {
+          this.night.witchHeal = true;
+          player.hasUsedHeal = true;
+        }
+        if (!player.hasUsedPoison) return;
+        this._resolveNight(io, broadcastFn);
+        return;
       }
+      if (payload.heal !== undefined) return;
       if (payload.poisonTargetId && !player.hasUsedPoison) {
         this.night.witchPoisonTarget = payload.poisonTargetId;
         player.hasUsedPoison = true;
@@ -661,11 +670,13 @@ class Game {
         return { action: null, message: 'Tien tri dang do xem van menh...' };
       case PHASE.NIGHT_WITCH:
         if (player.role === 'witch') {
-          const victim = this.night.currentWolfVictim ? this.players.get(this.night.currentWolfVictim) : null;
+          const victim = !player.hasUsedHeal && this.night.currentWolfVictim ? this.players.get(this.night.currentWolfVictim) : null;
+          const step = !player.hasUsedHeal && !this.night.witchHealDecided ? 'heal' : 'poison';
           return {
             action: 'witch_action',
-            message: victim ? `Dem nay Soi dang can: ${victim.name}` : 'Dem nay khong ai bi Soi can',
-            victimName: victim ? victim.name : null,
+            step,
+            message: step === 'heal' ? (victim ? `Sói cắn ${victim.name} trong đêm nay. Bạn có muốn cứu không?` : 'Đêm nay không có nạn nhân để cứu. Tiếp tục đến bước thuốc độc.') : 'Bạn có muốn dùng thuốc độc? Chọn một người hoặc bỏ qua.',
+            victimName: step === 'heal' && victim ? victim.name : null,
             canHeal: !player.hasUsedHeal && !!victim,
             canPoison: !player.hasUsedPoison,
             targets: others(true).map((p) => ({ id: p.id, name: p.name })),

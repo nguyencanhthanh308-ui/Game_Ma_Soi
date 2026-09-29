@@ -1,11 +1,5 @@
-# Nhạc nền (tự thêm, không đi kèm sẵn)
+# Nhạc nền ngày / đêm
 
-Vì lý do bản quyền, Claude không thể tự nhúng sẵn nhạc vào project. Để bật nhạc nền,
-bạn tự thêm 2 file MP3 không bản quyền (nhạc free-license, ví dụ từ freesound.org,
-Pixabay Music, YouTube Audio Library...) vào đúng thư mục này với đúng tên file:
+Hai file `bgm-day.wav` và `bgm-night.wav` đã đi kèm project. Đây là nhạc ambient tự tổng hợp, không lấy từ thư viện nhạc ngoài.
 
-- `bgm-day.mp3`  — nhạc phát khi đang ban ngày (thảo luận, bỏ phiếu)
-- `bgm-night.mp3` — nhạc phát khi đang ban đêm
-
-Nếu không thêm file, tính năng "Nhạc nền" trên giao diện vẫn hiển thị nhưng sẽ không phát
-được gì (im lặng, không báo lỗi) cho đến khi bạn thêm file đúng tên vào đây.
+Tái tạo bằng `node scripts/generate-music.cjs`. Người chơi tự bật/tắt nhạc và dẫn chuyện trên thiết bị của mình. Giọng dẫn chuyện dùng bộ đọc tiếng Việt của trình duyệt/hệ điều hành.

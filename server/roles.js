@@ -73,7 +73,7 @@ const ROLE_INFO = {
     "name": "Phù thủy",
     "team": "village",
     "icon": "🧪",
-    "desc": "Có một thuốc cứu và một thuốc độc, mỗi loại dùng một lần trong ván. Mỗi lượt chọn cứu, đầu độc hoặc bỏ qua. Thuốc cứu chỉ cứu nạn nhân lần cắn đầu.",
+    "desc": "Có một thuốc cứu và một thuốc độc, mỗi loại dùng một lần trong ván. Khi còn thuốc cứu, được xem nạn nhân Sói cắn đêm nay và quyết định cứu; sau đó chọn dùng độc hoặc bỏ qua. Có thể dùng cả hai trong cùng đêm. Thuốc cứu chỉ cứu nạn nhân lần cắn đầu.",
     "play": "Xem nạn nhân Sói cắn trước khi quyết định. Thuốc độc xuyên qua Bảo vệ và sức chống cắn.",
     "win": "Loại bỏ tất cả Sói, kể cả Sói trắng. Bạn vẫn thắng cùng phe nếu đã chết.",
     "maxCount": 1

@@ -134,6 +134,26 @@ io.on('connection', (socket) => {
     broadcastRoom(io, game);
   });
 
+  socket.on('set_role_config', (config, cb) => {
+    const game = rooms.get(socket.data.roomCode);
+    const player = game?.players.get(socket.data.playerId);
+    if (!player?.isHost || game.phase !== PHASE.LOBBY) return cb?.({ ok: false });
+    if (!config || Array.isArray(config) || typeof config !== 'object' || Object.keys(config).some(id =>
+      !Object.hasOwn(ROLE_INFO, id) || !Number.isInteger(config[id]) || config[id] < 0 || config[id] > ROLE_INFO[id].maxCount)) return cb?.({ ok: false });
+    game.roleConfig = { ...config };
+    io.to(game.roomCode).emit('role_config', game.roleConfig);
+    cb?.({ ok: true });
+  });
+
+  socket.on('chat_audio', (id, cb) => {
+    if (typeof cb !== 'function') return;
+    const game = rooms.get(socket.data.roomCode);
+    const player = game?.players.get(socket.data.playerId);
+    if (!player || player.socketId !== socket.id) return cb({ ok: false });
+    if (!game.chat.snapshot(game, player).messages.some(m => m.id === id && m.audio)) return cb({ ok: false });
+    cb({ ok: true, audio: game.chat.messages.find(m => m.id === id).audio });
+  });
+
   socket.on('player_action', ({ type, payload }) => {
     const game = rooms.get(socket.data.roomCode);
     if (!game) return;

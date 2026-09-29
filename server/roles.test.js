@@ -16,6 +16,27 @@ function setup(roles) {
   return [g, [...g.players.values()]];
 }
 function bite(g, p) { g.night = g._emptyNightActions(); g.night.wolfVictims = [p.id]; g.night.currentWolfVictim = p.id; g._resolveNight(io, noop); }
+test('witch can heal then poison, with victim hidden after heal is consumed', () => {
+  const [g,[witch,victim,target]]=setup(['witch','villager','werewolf']);
+  g.phase=PHASE.NIGHT_WITCH;g.night.currentWolfVictim=victim.id;g.night.wolfVictims=[victim.id];
+  assert.equal(g.getPhasePrompt(witch).victimName,victim.name);
+  g.recordAction(io,noop,witch.id,'witch_action',{heal:true});
+  assert.equal(g.phase,PHASE.NIGHT_WITCH);
+  assert.equal(g.getPhasePrompt(witch).step,'poison');
+  assert.equal(g.getPhasePrompt(witch).victimName,null);
+  g.recordAction(io,noop,witch.id,'witch_action',{poisonTargetId:target.id});
+  assert.ok(victim.alive);assert.equal(target.alive,false);
+  assert.ok(witch.hasUsedHeal&&witch.hasUsedPoison);
+});
+test('witch can skip heal then poison; timeout preserves an accepted heal', () => {
+  const [g,[witch,victim]]=setup(['witch','villager']);
+  g.phase=PHASE.NIGHT_WITCH;g.night.currentWolfVictim=victim.id;g.night.wolfVictims=[victim.id];
+  g.recordAction(io,noop,witch.id,'witch_action',{heal:false});
+  assert.equal(g.getPhasePrompt(witch).step,'poison');assert.equal(witch.hasUsedHeal,false);
+  g.recordAction(io,noop,witch.id,'witch_action',{});assert.equal(victim.alive,false);
+  const [h,[w,v]]=setup(['witch','villager']);h.phase=PHASE.NIGHT_WITCH;h.night.currentWolfVictim=v.id;h.night.wolfVictims=[v.id];
+  h.recordAction(io,noop,w.id,'witch_action',{heal:true});h._advanceFromTimer(io,noop);assert.ok(v.alive);
+});
 test('death announcements and public players hide dead roles until game over', () => {
   const [g, players] = setup(['werewolf', 'seer', 'witch', 'guard', 'hunter', 'prince']);
   players[5].revealedPrince = true;

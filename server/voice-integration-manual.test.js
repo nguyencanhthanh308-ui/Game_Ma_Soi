@@ -4,7 +4,7 @@ const { spawn } = require('node:child_process');
 const WebSocket = require('ws');
 
 test('voice channel assignment and signal relay isolation work end-to-end over real sockets', { timeout: 15000 }, async t => {
-  const child = spawn(process.execPath, ['server/index.js'], { env: { ...process.env, PORT: '0' }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, ['--preserve-symlinks', '--preserve-symlinks-main', 'server/index.js'], { env: { ...process.env, PORT: '0' }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   t.after(() => child.kill());
   const port = await new Promise((resolve, reject) => {
     child.stdout.on('data', chunk => { const m = String(chunk).match(/localhost:(\d+)/); if (m) resolve(Number(m[1])); });

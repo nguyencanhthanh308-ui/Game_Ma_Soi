@@ -1,6 +1,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Chat } = require('./Chat');
+test('voice metadata obeys channel privacy and payload is excluded from snapshots', () => {
+  const {chat,game,players:[wolf,,,villager]}=setup();
+  const audio={mime:'audio/webm',base64:Buffer.from('test audio').toString('base64')};
+  assert.ok(chat.send(game,wolf,{channel:'wolves',audio},1000).ok);
+  assert.equal(chat.snapshot(game,villager).messages.length,0);
+  assert.deepEqual(chat.snapshot(game,wolf).messages[0].audio,{mime:'audio/webm'});
+  assert.equal(chat.send(game,wolf,{channel:'wolves',audio:{mime:'text/html',base64:'AAAA'}},2000).ok,false);
+  assert.equal(chat.send(game,wolf,{channel:'wolves',audio:{mime:'audio/webm',base64:'A'.repeat(190000)}},2000).ok,false);
+  wolf.alive=false;villager.alive=false;
+  assert.ok(chat.send(game,wolf,{channel:'dead',audio},3000).ok);
+  assert.equal(chat.snapshot(game,villager).messages[0].channel,'dead');
+});
 
 test('replies use server-owned quotes and cannot expose private or pre-conversion messages', () => {
   const { chat, game, players: [wolf, cub, , villager, cursed] } = setup();

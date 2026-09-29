@@ -158,6 +158,7 @@ function requestRoleSuggestion() {
         requestRoleSuggestion();
         return;
       }
+      publishRoleConfig();
       renderRoleConfig();
     }
   });
@@ -184,6 +185,7 @@ fetch('/api/roles').then(res => { if (!res.ok) throw new Error(); return res.jso
   ROLE_STEP_ORDER = Object.keys(roles);
   SINGLE_ROLES = ROLE_STEP_ORDER.filter(id => roles[id].maxCount === 1);
   ROLE_NAMES = Object.fromEntries(ROLE_STEP_ORDER.map(id => [id, roles[id].name]));
+  renderSharedRoles(state.lastGameState?.roleConfig);
   if (state.roleConfig) renderRoleConfig();
 }).catch(() => {
   $('btn-start').disabled = true;
@@ -222,6 +224,7 @@ function renderRoleConfig() {
       const next = Math.max(0, Math.min(max, cur + delta));
       state.roleConfig[roleId] = next;
       state.roleConfigCustomized = true;
+      publishRoleConfig();
       renderRoleConfig();
     });
   });
@@ -232,6 +235,7 @@ function renderRoleConfig() {
 }
 
 function renderLobby(gs) {
+  renderSharedRoles(gs.roleConfig);
   $('room-code-display').textContent = gs.roomCode;
   $('player-count').textContent = gs.players.length;
   const list = $('player-list');
@@ -407,7 +411,7 @@ function renderActionArea(gs, priv) {
   if (prompt.action === 'witch_action') {
     const btns = document.createElement('div');
     btns.className = 'action-buttons';
-    if (prompt.canHeal) {
+    if (prompt.step === 'heal' && prompt.canHeal) {
       const healBtn = document.createElement('button');
       healBtn.className = 'btn-secondary';
       healBtn.textContent = '💊 Dùng thuốc giải cứu nạn nhân';
@@ -418,8 +422,8 @@ function renderActionArea(gs, priv) {
     }
     const skipBtn = document.createElement('button');
     skipBtn.className = 'btn-secondary';
-    skipBtn.textContent = 'Không dùng thuốc';
-    skipBtn.addEventListener('click', () => send('witch_action', {}));
+    skipBtn.textContent = prompt.step === 'heal' ? 'Không cứu → Tiếp tục' : 'Không dùng thuốc độc';
+    skipBtn.addEventListener('click', () => send('witch_action', prompt.step === 'heal' ? { heal: false } : {}));
     btns.appendChild(skipBtn);
     area.appendChild(btns);
 
@@ -430,7 +434,7 @@ function renderActionArea(gs, priv) {
       if (!state.selected.length) return toast('Chọn một người để đầu độc trước.');
       send('witch_action', { poisonTargetId: state.selected[0] });
     });
-    if (prompt.canPoison) area.appendChild(confirmPoison);
+    if (prompt.step === 'poison' && prompt.canPoison) area.appendChild(confirmPoison);
     return;
   }
 
@@ -553,6 +557,7 @@ socket.on('game_state', (gs) => {
 });
 
 socket.on('private_state', (priv) => {
+  if (state.lastPrivate?.prompt?.step !== priv.prompt?.step) state.submittedForPhase = null;
   window.gameVoice?.syncVoiceChannel(priv);
   renderSeerResults(priv.seerResults || []);
   if (state.lastPrivate?.role && priv.role && state.lastPrivate.role.id !== priv.role.id) state.hasSeenReveal = false;
@@ -585,3 +590,16 @@ function renderSeerResults(results) {
     }
   }
 }
+
+function publishRoleConfig() {
+  socket.emit('set_role_config', state.roleConfig);
+  renderSharedRoles(state.roleConfig);
+}
+function renderSharedRoles(config) {
+  $('shared-role-config').textContent = config ? Object.entries(config).filter(([, count]) => count > 0)
+    .map(([id, count]) => `${ROLE_NAMES[id] || id}: ${count}`).join(' · ') || 'Chưa chọn vai.' : 'Đang chờ chủ phòng chọn vai…';
+}
+socket.on('role_config', config => {
+  if (state.lastGameState) state.lastGameState.roleConfig = config;
+  renderSharedRoles(config);
+});

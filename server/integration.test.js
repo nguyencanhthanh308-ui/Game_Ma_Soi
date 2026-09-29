@@ -36,6 +36,10 @@ test('real server deals all 16 roles privately, sends descriptions and restarts'
   assert.ok((await host.emit('chat_send',{channel:'public',text:'Lobby hello'})).ok);
   for(let i=1;i<16;i++){const c=await connect();assert.ok((await c.emit('join_room',{roomCode:room.roomCode,name:'P'+i})).ok);}
   const roleConfig=Object.fromEntries(Object.keys(ROLE_INFO).map(id=>[id,1]));
+  assert.equal((await clients[1].emit('set_role_config',roleConfig)).ok,false);
+  assert.ok((await host.emit('set_role_config',roleConfig)).ok);
+  await new Promise(resolve=>setTimeout(resolve,100));
+  assert.deepEqual(clients[1].events.filter(e=>e[0]==='role_config').at(-1)[1],roleConfig);
   assert.ok((await host.emit('start_game',{roleConfig,durations:{NIGHT_CUPID:60}})).ok);
   await new Promise(resolve=>setTimeout(resolve,100));
   const assigned=[];
@@ -52,6 +56,15 @@ test('real server deals all 16 roles privately, sends descriptions and restarts'
   const wolf=clients.find(c=>roleOf(c)==='werewolf');
   const villager=clients.find(c=>roleOf(c)==='villager');
   const wolfMessage='Private pack discussion';
+  const audio={mime:'audio/webm',base64:Buffer.from('test voice').toString('base64')};
+  assert.ok((await wolf.emit('chat_send',{channel:'wolves',audio})).ok);
+  await new Promise(resolve=>setTimeout(resolve,100));
+  const audioMessage=wolf.events.filter(e=>e[0]==='chat_state').at(-1)[1].messages.find(m=>m.audio);
+  assert.ok(audioMessage);
+  assert.equal(audioMessage.audio.base64,undefined);
+  assert.equal((await villager.emit('chat_audio',audioMessage.id)).ok,false);
+  assert.deepEqual((await wolf.emit('chat_audio',audioMessage.id)).audio,audio);
+  await new Promise(resolve=>setTimeout(resolve,800));
   assert.equal((await villager.emit('chat_send',{channel:'wolves',text:'Sneaking in'})).ok,false);
   assert.equal((await villager.emit('chat_send',{channel:'public',text:'Night discussion'})).ok,false);
   assert.ok((await wolf.emit('chat_send',{channel:'wolves',text:wolfMessage})).ok);

@@ -44,7 +44,8 @@ class Chat {
         if (m.channel === 'wolves') return permissions.wolves.canRead && m.audience.includes(player.id);
         if (m.channel === 'dead') return permissions.dead.canRead && m.audience.includes(player.id);
         return false;
-      }).map(({ audience, replyAudience, ...message }) => {
+      }).map(({ audience, replyAudience, audio, ...message }) => {
+          if (audio) message.audio = { mime: audio.mime };
           if (replyAudience && !replyAudience.includes(player.id)) return { ...message, replyTo: null };
           return message;
         }),
@@ -52,12 +53,21 @@ class Chat {
   }
 
   send(game, player, data, now = Date.now()) {
-    if (!data || !['public', 'wolves', 'dead'].includes(data.channel) || typeof data.text !== 'string') {
+    if (!data || !['public', 'wolves', 'dead'].includes(data.channel) || (typeof data.text !== 'string' && !data.audio)) {
       return { ok: false, error: 'Tin nhắn không hợp lệ.' };
     }
     const permission = this.permissions(game, player)[data.channel];
     if (!permission.canSend) return { ok: false, error: 'Bạn không thể gửi vào kênh này lúc này.' };
-    const text = data.text.trim();
+    let audio = null;
+    if (data.audio) {
+      const { mime, base64 } = data.audio;
+      if (!['audio/webm', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'].includes(mime) ||
+          typeof base64 !== 'string' || base64.length > 180000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) {
+        return { ok: false, error: 'Voice không hợp lệ hoặc quá lớn (tối đa 20 giây / 130 KB).' };
+      }
+      audio = { mime, base64 };
+    }
+    const text = audio ? '🎙 Tin nhắn thoại' : data.text.trim();
     if (!text || text.length > 500) return { ok: false, error: 'Tin nhắn cần từ 1 đến 500 ký tự.' };
     if (now - (this.lastSent.get(player.id) ?? -Infinity) < 800) {
       return { ok: false, error: 'Bạn gửi quá nhanh. Hãy chờ một chút.' };
@@ -76,7 +86,7 @@ class Chat {
       : null;
     const message = {
       id: this.nextId++, channel: data.channel, playerId: player.id,
-      name: player.name, text, sentAt: now, audience,
+      name: player.name, text, sentAt: now, audience, audio,
       replyTo: original ? { id: original.id, playerId: original.playerId, name: original.name, text: original.text } : null,
       replyAudience: original?.audience || null,
     };

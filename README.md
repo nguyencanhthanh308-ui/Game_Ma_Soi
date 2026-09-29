@@ -11,7 +11,9 @@ Thiết kế cho khoảng **12–15 người chơi**, cho phép bắt đầu t�
 - Mỗi kênh giữ tối đa 100 tin, mỗi tin tối đa 500 ký tự; lịch sử xóa khi bắt đầu/chơi lại. Khi mất mạng, cùng tab tự kết nối lại bằng mã phiên riêng và lấy lại lịch sử được phép đọc. Không chia sẻ dữ liệu phiên cho người khác.
 - **Voice chat (giọng nói) 🎙️**: bấm "Bật mic" để nói chuyện trực tiếp bằng WebRTC (kết nối trực tiếp giữa các trình duyệt, không qua server lưu trữ âm thanh). Tự động chia 3 kênh theo trạng thái game — 🏘️ Làng (ban ngày, ai còn sống), 🐺 Bầy Sói (riêng tư ban đêm), 👻 Âm phủ (người đã mất) — giống hệt logic chat chữ ở trên. Có chấm sáng báo hiệu ai đang nói.
 - **Giọng dẫn chuyện 🔊**: tự động đọc to các mốc quan trọng ("Bầy Sói hãy dậy", "Tiên tri hãy dậy"...) bằng giọng đọc có sẵn của trình duyệt, có thể tắt bằng nút riêng.
-- **Nhạc nền 🎵** (tùy chọn): đổi nhạc ngày/đêm tự động nếu bạn tự thêm file MP3 (xem `public/sounds/README.md`), mặc định tắt.
+- **Nhạc nền 🎵**: đã kèm hai đoạn nhạc tự tổng hợp, đổi theo ngày/đêm; mỗi người tự bật/tắt, mặc định tắt.
+- **Gửi voice trong chat**: bấm “Ghi voice”, cho phép micro, rồi “Dừng và gửi voice”; tự dừng sau 20 giây, có nút hủy. Người nhận bấm “Nghe voice”. Ghi âm cần HTTPS (hoặc localhost). Voice tuân thủ quyền chat chung / Sói / Âm phủ; mất kết nối hoặc đổi lượt/kênh sẽ hủy bản ghi đang thu. Voice lưu trong bộ nhớ cùng lịch sử chat và bị xóa khi chơi lại.
+- **Bộ vai trong sảnh**: mọi người thấy số lượng từng vai mà chủ phòng đang chọn, cập nhật khi chỉnh; không hiện ai sẽ nhận vai nào.
 - Web app đóng vai trò **quản trò ảo**: tự động chia vai trò riêng tư cho từng người, dẫn dắt các lượt đêm (Sói cắn, Tiên tri soi, Phù thủy cứu/độc, Bảo vệ, Sói trắng, Cupid...), đếm ngược tự động chuyển pha, tổng hợp bỏ phiếu ban ngày, và báo thắng thua cuối game.
 - Mỗi người chơi tự mở link trên điện thoại/máy tính riêng của mình.
 - Tiên tri chọn mục tiêu rồi bấm **Soi người đã chọn**. Kết quả được lưu riêng trong **Kết quả soi của bạn**, hiện cả sau khi kết nối lại và ở màn hình kết thúc; ván mới sẽ xóa lịch sử cũ.
@@ -32,7 +34,7 @@ Game hỗ trợ **16 vai** theo bộ phổ biến mở rộng, với luật riê
 | Chán đời | Thắng riêng ngay khi bị bỏ phiếu treo cổ |
 | Hội Tam điểm | Biết các thành viên khác cùng hội; cho phép nhiều người có vai này |
 
-Sói trắng tham gia săn cùng bầy, có thêm một lần giết Sói khác và chỉ thắng khi sống sót cuối cùng. Phe Sói thường cần loại Sói trắng trước khi thắng theo số lượng. Sói con chết vì bất kỳ nguyên nhân nào sẽ kích hoạt **hai lượt chọn nạn nhân khác nhau** vào đêm tiếp theo. Phù thủy chọn một loại thuốc mỗi lượt; thuốc cứu chỉ cứu nạn nhân lần cắn đầu tiên. Cặp tình nhân thắng riêng nếu là hai người sống cuối cùng.
+Sói trắng tham gia săn cùng bầy, có thêm một lần giết Sói khác và chỉ thắng khi sống sót cuối cùng. Phe Sói thường cần loại Sói trắng trước khi thắng theo số lượng. Sói con chết vì bất kỳ nguyên nhân nào sẽ kích hoạt **hai lượt chọn nạn nhân khác nhau** vào đêm tiếp theo. Phù thủy quyết định cứu trước rồi chọn dùng độc hoặc bỏ qua, có thể dùng cả hai trong một đêm; mỗi bình chỉ dùng một lần trong ván. Chỉ khi còn bình cứu mới thấy nạn nhân bị cắn trong đêm hiện tại; không hồi sinh người chết hôm trước. Thuốc cứu chỉ cứu nạn nhân lần cắn đầu tiên. Cặp tình nhân thắng riêng nếu là hai người sống cuối cùng.
 
 Chạy `npm test` để kiểm tra năng lực, chia bài riêng tư và chơi lại, bao gồm kết nối 16 người chơi tới server thật.
 
@@ -111,7 +113,7 @@ masoi-online/
     chat.js      -> Giao diện chat 3 kênh
     voice.js     -> WebRTC mesh: kết nối trực tiếp giữa các trình duyệt, mic bật/tắt
     audio.js     -> Giọng dẫn chuyện (Text-to-Speech) + nhạc nền ngày/đêm, có bật/tắt
-    sounds/      -> Nơi tự thêm file nhạc nền MP3 (không đi kèm sẵn vì lý do bản quyền)
+    sounds/      -> Nhạc WAV ngày/đêm, tổng hợp bằng scripts/generate-music.cjs
 ```
 
 ## Giới hạn hiện tại / hướng mở rộng thêm
@@ -119,7 +121,7 @@ masoi-online/
 - **Voice chat dùng WebRTC mesh (kết nối trực tiếp p2p)**: hoạt động tốt với vài người trong 1 kênh (ví dụ 2-4 Sói, hoặc vài người ở Âm phủ). Với kênh Làng đông người (10+ người cùng lúc), mỗi trình duyệt phải mở nhiều kết nối cùng lúc nên có thể hơi nặng máy/mạng yếu — cân nhắc vẫn dùng thêm Discord/Zoom ngoài nếu phòng đông và mạng không ổn định.
 - **WebRTC cần STUN/TURN để xuyên NAT**: code đang dùng STUN công cộng miễn phí của Google, đủ dùng cho phần lớn mạng nhà/mạng di động thông thường. Nếu một số người không nghe được nhau (mạng công ty, mạng chặn UDP...), cần tự thêm TURN server riêng (ví dụ dịch vụ metered.ca) vào `RTC_CONFIG` trong `public/voice.js`.
 - **Giọng dẫn chuyện** phụ thuộc vào giọng đọc tiếng Việt có sẵn trên trình duyệt/thiết bị của từng người — chất lượng có thể khác nhau, một số máy có thể không có giọng tiếng Việt và sẽ đọc bằng giọng mặc định khác.
-- **Nhạc nền cần bạn tự thêm file** — không có sẵn.
+- Nhạc cần thao tác bấm của người dùng để trình duyệt cho phép phát. Giọng dẫn chuyện tiếng Việt phụ thuộc giọng đọc có sẵn trên thiết bị.
 - Vai trò được lưu trong bộ nhớ server (không dùng database) — nếu server restart giữa ván, các phòng đang chơi sẽ mất. Phù hợp cho các buổi chơi ngắn vài giờ.
 - Chưa có xác thực người dùng — bất kỳ ai có link + mã phòng đều vào được, phù hợp chơi với bạn bè.
 - Vì trạng thái vai trò gửi qua socket riêng cho từng người, một người chơi cố tình mở DevTools vẫn có thể xem được dữ liệu gửi tới đúng socket của họ (nhưng không thấy được vai trò người khác trừ khi cùng phe Sói).

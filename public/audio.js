@@ -1,8 +1,7 @@
 // public/audio.js
 // - Dan chuyen: dung Web Speech API (giong doc co san cua trinh duyet/OS), khong can file am thanh nao,
 //   nen khong dinh ban quyen. Chat luong giong doc phu thuoc vao trinh duyet/thiet bi cua tung nguoi.
-// - Nhac nen: chi dung file MP3 do NGUOI DUNG tu them vao public/sounds/bgm-day.mp3 va bgm-night.mp3
-//   (xem README). Neu khong co file, tinh nang tu bo qua trong im lang, khong bao loi ra man hinh.
+// Music loops are bundled WAV assets synthesized by scripts/generate-music.cjs.
 
 (() => {
   const narratorBtn = $('btn-toggle-narrator');
@@ -17,7 +16,7 @@
     NIGHT_WOLVES: 'Bầy Sói hãy dậy và chọn nạn nhân đêm nay.',
     NIGHT_WHITEWOLF: 'Sói trắng hãy dậy. Bạn có thể chọn giết một Sói đồng bọn.',
     NIGHT_SEER: 'Tiên tri hãy dậy và soi một người bạn nghi ngờ.',
-    NIGHT_WITCH: 'Phù thủy hãy dậy. Hãy quyết định dùng thuốc giải hoặc thuốc độc.',
+    NIGHT_WITCH: 'Phù thủy hãy dậy. Hãy quyết định cứu người, sau đó chọn dùng thuốc độc.',
     DAY_ANNOUNCE: 'Trời đã sáng, cả làng hãy thức dậy.',
     HUNTER_SHOT: 'Thợ săn hãy chọn người để mang theo trước khi ra đi.',
     DAY_DISCUSSION: 'Cả làng cùng nhau thảo luận để tìm ra Sói.',
@@ -44,6 +43,8 @@
     try {
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'vi-VN';
+      const voice = speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith('vi'));
+      if (voice) utter.voice = voice;
       utter.rate = 0.95;
       speechSynthesis.cancel(); // ngat cau dan truoc do neu con dang doc do
       speechSynthesis.speak(utter);
@@ -61,7 +62,7 @@
     const toPause = wanted === 'night' ? bgmDay : bgmNight;
     toPause.pause();
     toPlay.volume = 0.35;
-    toPlay.play().catch(() => { /* thieu file nhac hoac trinh duyet chan autoplay - bo qua trong im lang */ });
+    toPlay.play().catch(() => { currentTrack = null; });
   }
 
   function stopAllMusic() {
@@ -74,6 +75,7 @@
     settings.narratorOn = !settings.narratorOn;
     localStorage.setItem('masoi_narrator', settings.narratorOn ? 'on' : 'off');
     if (!settings.narratorOn && 'speechSynthesis' in window) speechSynthesis.cancel();
+    if (settings.narratorOn) speak(NARRATION[state.lastGameState?.phase] || 'Đã bật tiếng dẫn chuyện.');
     updateButtons();
   });
 
@@ -86,6 +88,9 @@
   });
 
   updateButtons();
+  document.addEventListener('pointerdown', () => {
+    if (settings.musicOn && state.lastGameState) playMusicFor(state.lastGameState.phase);
+  });
 
   // Goi tu app.js moi khi pha game thay doi
   window.gameAudio = {

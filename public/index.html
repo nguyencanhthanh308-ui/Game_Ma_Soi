@@ -48,6 +48,8 @@
 
         <h3>Người chơi (<span id="player-count">0</span>)</h3>
         <ul id="player-list" class="player-list"></ul>
+        <h3>Bộ vai chủ phòng đang chọn</h3>
+        <p id="shared-role-config" class="hint-text">Đang chờ chủ phòng chọn vai…</p>
 
         <div id="host-controls" class="host-controls hidden">
           <h3>Cấu hình vai trò</h3>
@@ -153,12 +155,14 @@
       <label for="chat-input" class="chat-input-label">Tin nhắn vào phòng chung</label>
       <input id="chat-input" type="text" maxlength="500" autocomplete="off" placeholder="Nhập tin nhắn…" />
       <button id="chat-send" class="btn-primary small" type="submit">Gửi</button>
+      <button id="chat-record" class="btn-secondary small" type="button">🎙 Ghi voice (20 giây)</button>
+      <button id="chat-record-cancel" class="btn-secondary small hidden" type="button">Hủy ghi</button>
     </form>
     <p id="chat-error" class="error-text" role="status"></p>
   </section>
 
-  <audio id="bgm-day" loop preload="none" src="sounds/bgm-day.mp3"></audio>
-  <audio id="bgm-night" loop preload="none" src="sounds/bgm-night.mp3"></audio>
+  <audio id="bgm-day" loop preload="none" src="sounds/bgm-day.wav"></audio>
+  <audio id="bgm-night" loop preload="none" src="sounds/bgm-night.wav"></audio>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>

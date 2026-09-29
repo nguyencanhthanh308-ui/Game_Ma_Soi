@@ -10,6 +10,64 @@
   let replies = { public: null, wolves: null, dead: null };
   let unread = { wolves: 0, dead: 0 };
   let lastSeenId = { wolves: 0, dead: 0 };
+  const rows = new Map();
+  let recording = null;
+  let askingMic = false;
+
+  function stopRecording(cancel = false) {
+    if (!recording) return;
+    recording.cancelled ||= cancel;
+    if (recording.recorder.state !== 'inactive') recording.recorder.stop();
+    recording.stream.getTracks().forEach(t => t.stop());
+  }
+  $('chat-record-cancel').addEventListener('click', () => stopRecording(true));
+  $('chat-record').addEventListener('click', async () => {
+    if (recording) return stopRecording();
+    if (askingMic || !snapshot?.permissions[channel]?.canSend) return;
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      $('chat-error').textContent = 'Ghi voice cần HTTPS và trình duyệt hỗ trợ micro.'; return;
+    }
+    askingMic = true;
+    const sentChannel = channel;
+    const sentPhase = state.lastGameState?.phase;
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (channel !== sentChannel || state.lastGameState?.phase !== sentPhase || !snapshot.permissions[channel].canSend || !socket.connected) {
+        stream.getTracks().forEach(t => t.stop()); return;
+      }
+      const mime = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'].find(t => MediaRecorder.isTypeSupported(t));
+      if (!mime) throw new Error('Trình duyệt không hỗ trợ định dạng voice phù hợp.');
+      const recorder = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 24000 });
+      const job = { recorder, stream, cancelled: false, channel: sentChannel, phase: sentPhase };
+      recording = job;
+      const chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      recorder.onerror = () => stopRecording(true);
+      recorder.onstop = async () => {
+        clearTimeout(job.timer);
+        stream.getTracks().forEach(t => t.stop());
+        recording = null;
+        $('chat-record').textContent = '🎙 Ghi voice (20 giây)';
+        $('chat-record-cancel').classList.add('hidden');
+        if (job.cancelled || !socket.connected || !snapshot.permissions[sentChannel]?.canSend) return;
+        const blob = new Blob(chunks, { type: mime });
+        if (!blob.size || blob.size > 130000) { $('chat-error').textContent = 'Voice quá lớn hoặc rỗng. Hãy ghi ngắn hơn.'; return; }
+        const reader = new FileReader();
+        reader.onload = () => socket.timeout(8000).emit('chat_send', {
+          channel: sentChannel, audio: { mime, base64: reader.result.split(',')[1] },
+        }, (error, result) => { $('chat-error').textContent = error ? 'Chưa xác nhận gửi voice.' : result?.ok ? '' : result?.error || 'Không gửi được voice.'; });
+        reader.readAsDataURL(blob);
+      };
+      recorder.start();
+      job.timer = setTimeout(() => stopRecording(), 20000);
+      $('chat-record').textContent = '⏹ Dừng và gửi voice';
+      $('chat-record-cancel').classList.remove('hidden');
+    } catch (error) {
+      stream?.getTracks().forEach(t => t.stop());
+      $('chat-error').textContent = 'Không ghi được voice: ' + error.message;
+    } finally { askingMic = false; }
+  });
 
   function mount(id) {
     const active = id || document.querySelector('.screen.active')?.id;
@@ -34,6 +92,8 @@
     if (!wolves) { drafts.wolves = ''; replies.wolves = null; unread.wolves = 0; }
     if (!dead) { drafts.dead = ''; replies.dead = null; unread.dead = 0; }
     const permission = snapshot.permissions[channel];
+    if (recording && (recording.channel !== channel || !permission.canSend || recording.phase !== state.lastGameState?.phase)) stopRecording(true);
+    $('chat-record').disabled = !permission.canSend || !socket.connected;
     const reply = replies[channel];
     $('chat-reply-preview').classList.toggle('hidden', !reply);
     $('chat-reply-text').textContent = reply ? `Trả lời @${reply.name}: ${reply.text}` : '';
@@ -56,7 +116,11 @@
     const key = channel + ':' + messages.map(m => m.id).join(',');
     const messagesChanged = key !== renderedKey;
     if (messagesChanged) {
-      list.replaceChildren();
+      if (!renderedKey.startsWith(channel + ':') || !rows.size || !messages.length) {
+        list.replaceChildren();
+        rows.clear();
+      }
+      for (const [id, row] of rows) if (!messages.some(m => m.id === id)) { row.remove(); rows.delete(id); }
       if (!messages.length) {
         const empty = document.createElement('li');
         empty.className = 'hint-text';
@@ -64,6 +128,7 @@
         list.appendChild(empty);
       }
       for (const message of messages) {
+        if (rows.has(message.id)) continue;
         const row = document.createElement('li');
         row.className = 'chat-message';
         const author = document.createElement('strong');
@@ -80,6 +145,24 @@
           row.appendChild(quote);
         }
         row.appendChild(body);
+        if (message.audio) {
+          const play = document.createElement('button');
+          play.className = 'btn-secondary small';
+          play.textContent = '▶ Nghe voice';
+          play.addEventListener('click', () => {
+            play.disabled = true;
+            socket.timeout(8000).emit('chat_audio', message.id, (error, result) => {
+              if (error || !result?.ok) { play.disabled = false; play.textContent = 'Thử tải voice lại'; return; }
+              const audio = document.createElement('audio');
+              audio.controls = true;
+              audio.src = `data:${result.audio.mime};base64,${result.audio.base64}`;
+              row.appendChild(audio);
+              play.remove();
+              audio.play().catch(() => {});
+            });
+          });
+          row.appendChild(play);
+        }
         const replyButton = document.createElement('button');
         replyButton.type = 'button';
         replyButton.className = 'chat-reply-button';
@@ -99,6 +182,7 @@
         });
         row.appendChild(replyButton);
         list.appendChild(row);
+        rows.set(message.id, row);
       }
       renderedKey = key;
     }
@@ -107,6 +191,7 @@
   }
 
   function select(next) {
+    if (recording) stopRecording(true);
     drafts[channel] = input.value;
     channel = next;
     input.value = drafts[channel];
@@ -165,6 +250,7 @@
     render();
   });
   socket.on('disconnect', () => {
+    stopRecording(true);
     $('chat-error').textContent = 'Mất kết nối. Đang kết nối lại…';
     render();
   });

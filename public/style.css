@@ -498,30 +498,36 @@ body { transition: background .6s ease, color .6s ease; }
 /* Ngoai phong choi thi ca hai khung deu .hidden -> an luon cot de no khong chiem cho */
 .room-side:not(:has(> section:not(.hidden))) { display: none; }
 
-/* ---- Giu o nhap chat luon trong tam mat tren man hinh rong ----
-   Cot ben phai (voice + chat) cao hon man hinh nen position:sticky khong an thua:
-   phai cuon xuong het trang moi thay o nhap va nut Gui. Gioi han cot trong chieu cao
-   khung nhin, roi cho danh sach tin nhan co lai de phan soan tin luon nam duoi cung. */
+/* ---- Cot ben phai: chi danh sach tin nhan duoc cuon ----
+   Cot (voice + chat) bi gioi han trong chieu cao khung nhin de position:sticky co tac dung
+   va o nhap luon trong tam mat. Ca cot va khung voice KHONG cuon: neu cuon ca cot thi
+   thanh cuon keo dai qua ca voice lan chat. Phan chieu cao thieu chi lay tu danh sach
+   tin nhan, nen do la thanh cuon duy nhat va nam gon trong khung chat. */
 @media (min-width: 960px) {
-  .room-side { max-height: calc(100svh - 48px); overflow-y: auto; }
-
-  /* Khung voice cao tu nhien toi 427px, an het cho cua khung chat. Cho no co lai va
-     tu cuon ben trong: nut mic va ten kenh van o tren cung, danh sach nguoi cuon duoi. */
-  .room-side > .room-voice { flex: 0 1 auto; min-height: 130px; overflow-y: auto; }
-
-  /* Khung chat khong bi co xuong duoi muc con doc duoc, nho vay phan soan tin
-     luon nam trong khung nhin ma khong phai cuon xuong cuoi trang. */
-  /* Khong dat min-height:0 o day: can giu chieu cao toi thieu tu nhien cua khung chat
-     (tieu de + danh sach toi thieu + khung soan tin) de flexbox khong ep no nho hon
-     noi dung, khien phan soan tin bi day ra ngoai. */
-  .room-side > .room-chat { display: flex; flex-direction: column; flex: 1 1 auto; }
-  /* height co dinh o tren se chan viec co lai -> tra ve auto va cho no chiem phan trong */
-  .room-side > .room-chat .chat-messages { flex: 1 1 auto; height: auto; min-height: 110px; }
-  .room-side > .room-chat .chat-form { flex: 0 0 auto; }
+  .room-side { max-height: calc(100svh - 48px); overflow: hidden; }
+  .room-side > .room-voice { flex: 0 0 auto; min-height: 0; overflow: visible; }
+  .room-side > .room-chat { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  /* Tieu de, nut kenh, khung soan tin giu nguyen chieu cao; chi danh sach tin nhan co lai */
+  .room-side > .room-chat > * { flex-shrink: 0; }
+  .room-side > .room-chat .chat-messages { flex: 1 1 auto; height: clamp(200px, 50vh, 520px); min-height: 0; }
 }
 
-/* Phong dong nguoi thi danh sach nay dai ra vo han, keo tut o nhap chat xuong duoi */
-.voice-peer-list { max-height: 148px; overflow-y: auto; }
+/* Thu gon khung voice va phan dau khung chat de danh cho cho danh sach tin nhan */
+.voice-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.voice-head h3 { margin: 0; }
+.voice-head button { width: auto; margin: 0; flex-shrink: 0; }
+.room-side .voice-channel-label { margin: 12px 0 2px; font-size: 13px; }
+.room-side #voice-hint { margin: 0; text-align: left; }
+/* Nguoi trong kenh xep thanh the nho tren cung hang thay vi moi nguoi mot dong */
+.room-side .voice-peer-list { flex-direction: row; flex-wrap: wrap; margin-top: 8px; max-height: 96px; overflow-y: auto; }
+.room-side .voice-peer-list:empty { display: none; }
+.room-side .voice-peer-list li { padding: 4px 10px; font-size: .8rem; }
+.room-side .room-chat > .eyebrow { margin-bottom: 4px; }
+.room-side .room-chat h3 { font-size: 20px; margin: 0 0 10px; }
+.room-side .chat-channels button { min-height: 34px; padding: 6px 12px; }
+.room-side #chat-hint { margin: 8px 0 0; }
+.room-side .chat-messages { margin: 8px 0; }
+.room-side .chat-input-label { margin: 0 0 4px; }
 
 /* ---- Hai nut am thanh nam tren header ----
    Truoc day chung nam cuoi khung voice; khi khung voice co lai tren man hinh thap

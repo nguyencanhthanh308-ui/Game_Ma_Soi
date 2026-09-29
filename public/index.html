@@ -173,9 +173,11 @@
 
   <div id="room-side" class="room-side">
   <section id="room-voice" class="room-voice hidden" aria-label="Voice chat trong phòng">
-    <h3>🎙️ Voice chat</h3>
+    <div class="voice-head">
+      <h3>🎙️ Voice chat</h3>
+      <button id="btn-toggle-mic" class="btn-primary small">🎤 Bật mic</button>
+    </div>
     <p id="voice-channel-label" class="voice-channel-label">🔇 Không có kênh voice lúc này</p>
-    <button id="btn-toggle-mic" class="btn-primary small">🎤 Bật mic</button>
     <p id="voice-hint" class="hint-text"></p>
     <ul id="voice-peer-list" class="voice-peer-list"></ul>
   </section>

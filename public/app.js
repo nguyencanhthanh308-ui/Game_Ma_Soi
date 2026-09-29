@@ -527,7 +527,7 @@ socket.on('game_state', (gs) => {
   const inGame = gs.phase !== 'LOBBY' && gs.phase !== 'GAME_OVER';
   document.documentElement?.classList?.toggle('theme-day', inGame && isDay);
   document.documentElement?.classList?.toggle('theme-night', inGame && !isDay);
-  if (prevPhase !== gs.phase) window.gameAudio?.onPhaseChange(gs.phase);
+  if (prevPhase !== gs.phase) window.gameAudio?.onPhaseChange(gs.phase, prevPhase, gs);
 
   if (gs.phase === 'LOBBY') {
     state.lastPrivate = null;

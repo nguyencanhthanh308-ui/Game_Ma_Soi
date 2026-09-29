@@ -38,7 +38,9 @@
     panel.classList.toggle('hidden', !visible);
     if (visible) {
       const target = document.querySelector(`#${active}`);
-      if (panel.parentNode !== target) target.appendChild(panel);
+      // Khung voice va khung chat nam chung mot cot, nen di chuyen ca cot.
+      const side = $('room-side');
+      if (side.parentNode !== target) target.appendChild(side);
     }
   }
 

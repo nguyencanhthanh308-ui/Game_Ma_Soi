@@ -75,9 +75,11 @@
     panel.classList.toggle('hidden', !visible);
     if (visible) {
       const target = document.querySelector(`#${active}`);
+      // Khung voice va khung chat nam chung mot cot, nen di chuyen ca cot.
+      const side = $('room-side');
       // Moving a focused input, even within the same parent, can dismiss the keyboard.
-      if (panel.parentNode !== target) {
-        target.appendChild(panel);
+      if (side.parentNode !== target) {
+        target.appendChild(side);
         list.scrollTop = list.scrollHeight;
       }
     }

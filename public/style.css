@@ -464,3 +464,36 @@ body { transition: background .6s ease, color .6s ease; }
 :root.theme-day #connection-status { background: #f7dcd8; border-bottom-color: #c0392b; color: #86271c; }
 /* #ff8080 la do nhat, doc tren nen giay se khong ro -> dam lai cho du tuong phan */
 :root.theme-day .error-text { color: #9e2b1e; }
+
+/* ---- Khung soan tin nhan ----
+   Panel chat chi rong 320px o desktop, ma hai nut "Gui" + "Ghi voice (20 giay)"
+   da chiem ~220px. Khi o nhap dung flex:1 (co so 0) no bi bop con ~35px.
+   Cho o nhap chiem tron mot hang, hai nut xuong hang duoi chia nhau chieu rong. */
+.chat-form input[type="text"] { flex: 1 1 100%; width: 100%; }
+.chat-form button { flex: 1 1 auto; min-width: 0; }
+#chat-record, #chat-record-cancel { flex: 2 1 auto; }
+
+/* ---- Bo cuc 3 cot: the chinh + voice + chat ----
+   Truoc day the chinh giu cung 690px, nen tong be ngang (690+260+320+khoang cach)
+   vuot qua man 1366px va khung chat bi day han xuong hang duoi, chua mot khoang
+   trong lon ben phai. Tu 1180px tro len cho ba cot nam cung hang va the chinh co lai. */
+@media (min-width: 960px) {
+  .screen.chat-layout { flex-wrap: nowrap; align-items: flex-start; }
+  .chat-layout > .card, .chat-layout > .game-layout { flex: 1 1 auto; min-width: 0; }
+}
+
+/* ---- Cot ben phai: khung voice nam tren, khung chat nam duoi, chung mot cot ---- */
+.room-side { display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 690px; min-width: 0; }
+/* .room-chat / .room-voice co san flex-basis dat cho bo cuc nam ngang. Trong mot cot doc
+   thi flex-basis lai la CHIEU CAO, nen phai tra ve auto keo hai khung bi ep cung chieu cao. */
+.room-side > .room-voice, .room-side > .room-chat {
+  flex: 0 1 auto; position: static; width: 100%; max-width: none;
+}
+@media (min-width: 960px) {
+  .room-side { flex: 0 0 340px; position: sticky; top: 24px; }
+}
+
+/* Dong liet ke bo vai nam ngay duoi tieu de can trai, nen cung can trai cho thang hang */
+#shared-role-config { text-align: left; }
+/* Ngoai phong choi thi ca hai khung deu .hidden -> an luon cot de no khong chiem cho */
+.room-side:not(:has(> section:not(.hidden))) { display: none; }

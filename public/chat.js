@@ -6,10 +6,10 @@
   let snapshot = null;
   let pending = false;
   let renderedKey = '';
-  let drafts = { public: '', wolves: '' };
-  let replies = { public: null, wolves: null };
-  let unread = 0;
-  let lastWolfId = 0;
+  let drafts = { public: '', wolves: '', dead: '' };
+  let replies = { public: null, wolves: null, dead: null };
+  let unread = { wolves: 0, dead: 0 };
+  let lastSeenId = { wolves: 0, dead: 0 };
 
   function mount(id) {
     const active = id || document.querySelector('.screen.active')?.id;
@@ -28,32 +28,33 @@
   function render() {
     if (!snapshot) return;
     const wolves = snapshot.permissions.wolves.canRead;
-    if (!wolves) {
-      channel = 'public';
-      drafts.wolves = '';
-      replies.wolves = null;
-      unread = 0;
-    }
+    const dead = snapshot.permissions.dead?.canRead || false;
+    if (!wolves && channel === 'wolves') { channel = 'public'; }
+    if (!dead && channel === 'dead') { channel = 'public'; }
+    if (!wolves) { drafts.wolves = ''; replies.wolves = null; unread.wolves = 0; }
+    if (!dead) { drafts.dead = ''; replies.dead = null; unread.dead = 0; }
     const permission = snapshot.permissions[channel];
     const reply = replies[channel];
     $('chat-reply-preview').classList.toggle('hidden', !reply);
     $('chat-reply-text').textContent = reply ? `Trả lời @${reply.name}: ${reply.text}` : '';
     $('chat-wolves').classList.toggle('hidden', !wolves);
+    $('chat-dead').classList.toggle('hidden', !dead);
     $('chat-public').setAttribute('aria-pressed', String(channel === 'public'));
     $('chat-wolves').setAttribute('aria-pressed', String(channel === 'wolves'));
-    $('chat-wolves').textContent = '🐺 Bầy Sói · riêng tư' + (unread ? ` (${unread} mới)` : '');
+    $('chat-dead').setAttribute('aria-pressed', String(channel === 'dead'));
+    $('chat-wolves').textContent = '🐺 Bầy Sói · riêng tư' + (unread.wolves ? ` (${unread.wolves} mới)` : '');
+    $('chat-dead').textContent = '👻 Âm phủ · riêng tư' + (unread.dead ? ` (${unread.dead} mới)` : '');
     $('chat-hint').textContent = permission.canSend
-      ? channel === 'wolves' ? 'Chỉ Sói còn sống nhận được tin nhắn này, bao gồm Sói trắng.' : 'Mọi người trong phòng đều đọc được tin nhắn này.'
+      ? channel === 'wolves' ? 'Chỉ Sói còn sống nhận được tin nhắn này, bao gồm Sói trắng.'
+      : channel === 'dead' ? 'Chỉ người chơi đã mất mới đọc và gửi được tin trong kênh này.'
+      : 'Mọi người trong phòng đều đọc được tin nhắn này.'
       : permission.reason;
     input.disabled = !permission.canSend || !socket.connected;
     $('chat-send').disabled = pending || input.disabled;
-    document.querySelector('label[for="chat-input"]').textContent = channel === 'wolves' ? 'Tin nhắn riêng cho bầy Sói' : 'Tin nhắn vào phòng chung';
+    document.querySelector('label[for="chat-input"]').textContent = channel === 'wolves' ? 'Tin nhắn riêng cho bầy Sói' : channel === 'dead' ? 'Tin nhắn riêng cho Âm phủ' : 'Tin nhắn vào phòng chung';
     const messages = snapshot.messages.filter(m => m.channel === channel);
     const key = channel + ':' + messages.map(m => m.id).join(',');
     const messagesChanged = key !== renderedKey;
-    const previousScrollTop = list.scrollTop;
-    const followLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 48 ||
-      !renderedKey.startsWith(channel + ':');
     if (messagesChanged) {
       list.replaceChildren();
       if (!messages.length) {
@@ -102,30 +103,21 @@
       renderedKey = key;
     }
     mount();
-    if (messagesChanged) {
-      list.scrollTop = followLatest ? list.scrollHeight : previousScrollTop;
-      $('chat-latest').classList.toggle('hidden', followLatest);
-    }
+    if (messagesChanged) list.scrollTop = list.scrollHeight;
   }
-
-  $('chat-latest').addEventListener('click', () => {
-    list.scrollTop = list.scrollHeight;
-    $('chat-latest').classList.toggle('hidden', true);
-  });
-  list.addEventListener('scroll', () => {
-    if (list.scrollHeight - list.scrollTop - list.clientHeight < 48) $('chat-latest').classList.toggle('hidden', true);
-  });
 
   function select(next) {
     drafts[channel] = input.value;
     channel = next;
     input.value = drafts[channel];
-    if (channel === 'wolves') unread = 0;
+    if (channel === 'wolves') unread.wolves = 0;
+    if (channel === 'dead') unread.dead = 0;
     $('chat-error').textContent = '';
     render();
   }
   $('chat-public').addEventListener('click', () => select('public'));
   $('chat-wolves').addEventListener('click', () => select('wolves'));
+  $('chat-dead').addEventListener('click', () => select('dead'));
   $('chat-reply-cancel').addEventListener('click', () => {
     const reply = replies[channel];
     if (reply && input.value.startsWith(`@${reply.name} `)) input.value = input.value.slice(reply.name.length + 2);
@@ -155,17 +147,20 @@
     });
   });
   socket.on('chat_state', data => {
-    const latestWolf = data.messages.filter(m => m.channel === 'wolves').at(-1)?.id || 0;
-    if (latestWolf > lastWolfId && channel !== 'wolves') unread += data.messages.filter(m => m.channel === 'wolves' && m.id > lastWolfId).length;
-    lastWolfId = latestWolf;
+    for (const ch of ['wolves', 'dead']) {
+      const latest = data.messages.filter(m => m.channel === ch).at(-1)?.id || 0;
+      if (latest > lastSeenId[ch] && channel !== ch) unread[ch] += data.messages.filter(m => m.channel === ch && m.id > lastSeenId[ch]).length;
+      lastSeenId[ch] = latest;
+    }
     if (snapshot?.messages.length && !data.messages.length) {
-      drafts = { public: '', wolves: '' };
-      replies = { public: null, wolves: null };
+      drafts = { public: '', wolves: '', dead: '' };
+      replies = { public: null, wolves: null, dead: null };
       input.value = '';
       renderedKey = '';
-      unread = 0;
+      unread = { wolves: 0, dead: 0 };
     }
     if (snapshot?.permissions.wolves.canRead && !data.permissions.wolves.canRead && channel === 'wolves') input.value = drafts.public;
+    if (snapshot?.permissions.dead?.canRead && !data.permissions.dead?.canRead && channel === 'dead') input.value = drafts.public;
     snapshot = data;
     render();
   });

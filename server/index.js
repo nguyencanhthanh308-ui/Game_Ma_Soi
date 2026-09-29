@@ -5,11 +5,11 @@ const path = require('path');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { Game, PHASE, DEFAULT_DURATIONS } = require('./Game');
+const { Game, PHASE } = require('./Game');
 const { ROLE_INFO, isWolfTeam } = require('./roles');
 const { Chat } = require('./Chat');
+const { voiceChannelFor, voiceRoster } = require('./voice');
 const { randomUUID } = require('crypto');
-const { TokenBucket, RoomCleanup, HostRecovery } = require('./Security');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,14 +22,6 @@ app.get('/api/roles', (_req, res) => res.json(ROLE_INFO));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const rooms = new Map(); // roomCode -> Game
-const roomCleanup = new RoomCleanup(rooms);
-const hostRecovery = new HostRecovery(rooms, game => broadcastRoom(io, game));
-const ipLimits = new Map();
-const ipSweep = setInterval(() => {
-  const cutoff = Date.now() - 60 * 1000;
-  for (const [ip, bucket] of ipLimits) if (bucket.updatedAt < cutoff) ipLimits.delete(ip);
-}, 60 * 1000);
-ipSweep.unref();
 
 function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -43,13 +35,12 @@ function generateRoomCode() {
 function broadcastRoom(io, game) {
   const publicState = game.publicState();
   io.to(game.roomCode).emit('game_state', publicState);
+  const voiceGroups = voiceRoster(game);
 
   // Gui thong tin rieng tu (vai tro, goi y hanh dong) cho tung nguoi choi con ket noi
   for (const player of game.players.values()) {
     if (!player.connected) continue;
-    const payload = { role: null, prompt: null, seerHistory: player.role === 'seer' ? (player.seerHistory || []) : [] };
-    payload.actionContext = game.actionContext();
-    payload.submitted = game.hasSubmitted(player);
+    const payload = { role: null, prompt: null, seerResults: player.role === 'seer' ? (player.seerResults || []) : [] };
     if (player.role) {
       const info = ROLE_INFO[player.role];
       payload.role = { ...info };
@@ -68,57 +59,15 @@ function broadcastRoom(io, game) {
     if (game.phase !== PHASE.LOBBY && game.phase !== PHASE.GAME_OVER) {
       payload.prompt = game.getPhasePrompt(player);
     }
+    const myVoiceChannel = voiceChannelFor(game, player);
+    payload.voiceChannel = myVoiceChannel;
+    payload.voicePeers = myVoiceChannel ? voiceGroups[myVoiceChannel].filter((p) => p.playerId !== player.id) : [];
     io.to(player.socketId).emit('private_state', payload);
     io.to(player.socketId).emit('chat_state', game.chat.snapshot(game, player));
   }
 }
 
 io.on('connection', (socket) => {
-  const eventLimit = new TokenBucket(30, 10);
-  // Validate packets before destructuring or invoking client-supplied callbacks.
-  socket.use((packet, next) => {
-    const [event, data] = packet;
-    const cb = packet[2];
-    if (!eventLimit.take()) {
-      if (typeof cb === 'function') cb({ ok: false, error: 'Bạn thao tác quá nhanh. Hãy chờ một chút.' });
-      return;
-    }
-    if (event === 'create_room' || event === 'join_room') {
-      // Use the transport address, never a client-supplied forwarded header.
-      const ip = socket.handshake.address;
-      let bucket = ipLimits.get(ip);
-      if (!bucket) {
-        if (ipLimits.size >= 10000) {
-          if (typeof cb === 'function') cb({ ok: false, error: 'Server đang bận. Hãy thử lại sau.' });
-          return;
-        }
-        bucket = new TokenBucket(60, 2);
-        ipLimits.set(ip, bucket);
-      }
-      if (!bucket.take()) {
-        if (typeof cb === 'function') cb({ ok: false, error: 'Có quá nhiều lượt vào phòng. Hãy thử lại sau.' });
-        return;
-      }
-    }
-    const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-    const name = value => typeof value === 'string' && value.trim().length > 0;
-    const validators = {
-      create_room: () => object(data) && name(data.name),
-      join_room: () => object(data) && name(data.name) && typeof data.roomCode === 'string',
-      start_game: () => object(data) && object(data.roleConfig) && (data.durations === undefined ||
-        (object(data.durations) && Object.entries(data.durations).every(([key, value]) =>
-          Object.hasOwn(DEFAULT_DURATIONS, key) && Number.isFinite(value) && value >= 1 && value <= 3600))),
-      player_action: () => object(data) && typeof data.type === 'string' &&
-        (data.payload === undefined || (object(data.payload) &&
-          (data.payload.targetIds === undefined || Array.isArray(data.payload.targetIds)))),
-    };
-    if ((cb !== undefined && typeof cb !== 'function') ||
-        (Object.hasOwn(validators, event) && !validators[event]())) {
-      if (typeof cb === 'function') cb({ ok: false, error: 'Dữ liệu không hợp lệ.' });
-      return;
-    }
-    next();
-  });
   socket.on('create_room', ({ name }, cb) => {
     if (socket.data.roomCode) return cb && cb({ ok: false, error: 'Bạn đã ở trong một phòng.' });
     const roomCode = generateRoomCode();
@@ -158,14 +107,9 @@ io.on('connection', (socket) => {
     }
 
     socket.join(code);
-    roomCleanup.update(game);
-    hostRecovery.update(game);
     socket.data.roomCode = code;
     socket.data.playerId = player.id;
     cb && cb({ ok: true, roomCode: code, playerId: player.id, sessionToken: player.sessionToken });
-    if (game.phase === PHASE.ROLE_REVEAL && [...game.players.values()].every(p => p.ready && p.connected)) {
-      game.enterNight(io, () => broadcastRoom(io, game));
-    }
     broadcastRoom(io, game);
   });
 
@@ -186,20 +130,30 @@ io.on('connection', (socket) => {
     game.chat.reset();
 
     cb && cb({ ok: true });
+    game.enterNight(io, () => broadcastRoom(io, game));
     broadcastRoom(io, game);
   });
 
-  socket.on('player_action', ({ type, payload, actionContext }, cb) => {
-    const reply = result => { if (typeof cb === 'function') cb(result); };
+  socket.on('player_action', ({ type, payload }) => {
     const game = rooms.get(socket.data.roomCode);
-    if (!game) return reply({ ok: false, error: 'Bạn chưa ở trong phòng.' });
-    const player = game.players.get(socket.data.playerId);
-    if (!player?.connected || player.socketId !== socket.id) return reply({ ok: false, error: 'Phiên kết nối không hợp lệ.' });
-    if (actionContext !== undefined && actionContext !== game.actionContext()) {
-      return reply({ ok: false, error: 'Lượt chơi đã thay đổi. Hãy chọn lại ở lượt hiện tại.' });
-    }
-    const accepted = game.recordAction(io, () => broadcastRoom(io, game), socket.data.playerId, type, payload || {});
-    reply(accepted ? { ok: true } : { ok: false, error: 'Lựa chọn không hợp lệ hoặc đã hết lượt. Hãy thử lại.' });
+    if (!game) return;
+    game.recordAction(io, () => broadcastRoom(io, game), socket.data.playerId, type, payload || {});
+    broadcastRoom(io, game);
+  });
+
+  // Relay tin hieu WebRTC (offer/answer/ICE candidate) giua 2 nguoi choi trong cung mot kenh voice.
+  // Server khong xu ly noi dung am thanh, chi chuyen tiep goi tin bao mat theo playerId that (khong tin client).
+  socket.on('voice_signal', ({ toPlayerId, data }) => {
+    const game = rooms.get(socket.data.roomCode);
+    if (!game || !data) return;
+    const me = game.players.get(socket.data.playerId);
+    const target = game.players.get(toPlayerId);
+    if (!me || !me.connected || me.socketId !== socket.id || !target || !target.connected) return;
+    // Chi cho relay neu ca 2 dang cung o mot kenh voice hop le (chong gia mao ket noi ngoai y muon)
+    const myChannel = voiceChannelFor(game, me);
+    const targetChannel = voiceChannelFor(game, target);
+    if (!myChannel || myChannel !== targetChannel) return;
+    io.to(target.socketId).emit('voice_signal', { fromPlayerId: me.id, data });
   });
 
   socket.on('chat_send', (data, cb) => {
@@ -224,21 +178,14 @@ io.on('connection', (socket) => {
     if (!player || !player.isHost) return cb && cb({ ok: false, error: 'Chi chu phong moi duoc lam moi' });
     if (game.timer) clearTimeout(game.timer);
     for (const p of game.players.values()) {
-      if (!p.connected) game.players.delete(p.id);
-    }
-    for (const p of game.players.values()) {
       p.role = null;
       p.alive = true;
       p.loverId = null;
-      p.ready = false;
-      p.seerHistory = [];
     }
     game.phase = PHASE.LOBBY;
     game.phaseEndsAt = null;
     game.winner = null;
     game.lastDeaths = [];
-    game.voteHistory = [];
-    game.lastVoteResult = null;
     game.nightNumber = 0;
     game.dayNumber = 0;
     game.chat.reset();
@@ -256,7 +203,6 @@ function handleLeave(socket) {
   const game = rooms.get(roomCode);
   if (!game) return;
   game.removePlayerBySocket(socket.id);
-  hostRecovery.update(game);
   socket.leave(roomCode);
   delete socket.data.roomCode;
   delete socket.data.playerId;
@@ -264,7 +210,6 @@ function handleLeave(socket) {
     if (game.timer) clearTimeout(game.timer);
     rooms.delete(roomCode);
   } else {
-    roomCleanup.update(game);
     broadcastRoom(io, game);
   }
 }

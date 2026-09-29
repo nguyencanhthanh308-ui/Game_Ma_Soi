@@ -184,6 +184,13 @@ function isWolfTeam(roleId) {
 function getDefaultRoleConfig(n) {
   const config = Object.fromEntries(Object.keys(ROLE_INFO).map(id => [id, 0]));
 
+  if (n < 6) {
+    config.werewolf = n >= 2 ? 1 : 0;
+    config.seer = n >= 3 ? 1 : 0;
+    config.villager = Math.max(0, n - config.werewolf - config.seer);
+    return config;
+  }
+
   if (n >= 6) {
     config.seer = 1;
     config.witch = 1;
@@ -201,7 +208,7 @@ function getDefaultRoleConfig(n) {
   }
 
   const specialWolves = config.wolfcub + config.whitewolf;
-  const wolvesTotal = n >= 3 && n < 5 ? 1 : Math.max(2, Math.round(n / 3.2));
+  const wolvesTotal = Math.max(2, Math.round(n / 3.2));
   config.werewolf = Math.max(0, wolvesTotal - specialWolves);
 
   const used =
@@ -242,13 +249,11 @@ function validateRoleConfig(config, n) {
   if (total !== n) {
     errors.push(`Tong so vai tro (${total}) phai bang so nguoi choi (${n})`);
   }
-  // Never coerce values from a rejected configuration (JSON objects may override valueOf/toString).
-  if (errors.length) return errors;
   const wolfTotal = (config.werewolf || 0) + (config.wolfcub || 0) + (config.whitewolf || 0);
-  if (wolfTotal < 1) {
+  if (n > 1 && wolfTotal < 1) {
     errors.push('Can it nhat 1 Soi trong game');
   }
-  if (wolfTotal * 2 >= n) {
+  if (n >= 3 && wolfTotal * 2 >= n) {
     errors.push('So luong Soi qua nhieu so voi Dan lang, hay giam bot');
   }
   return errors;

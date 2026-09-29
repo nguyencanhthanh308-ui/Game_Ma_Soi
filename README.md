@@ -1,22 +1,20 @@
 # 🐺 Ma Sói Online
 
 Web app quản trò ảo cho trò chơi Ma Sói (Werewolf), chơi real-time qua Socket.io.
-Giao diện **Trăng Khuyết · Pixel Edition**: tranh làng vẽ bằng Canvas, chuyển cảnh theo ngày/đêm và thẻ nhân vật pixel. Không cần tải thư viện 3D hay ảnh từ dịch vụ bên ngoài; tôn trọng tùy chọn giảm chuyển động của thiết bị.
-Thiết kế cho khoảng **12–15 người chơi**, tối đa 20 người. Có thể bắt đầu từ 3 người với cấu hình hợp lệ (ít nhất 1 Sói, số Sói ít hơn số Dân); phòng 3–5 người phù hợp chơi thử, chưa được kiểm chứng cân bằng.
-
-- Sau khi chia vai, tất cả người chơi phải xác nhận đã đọc vai và đang kết nối thì đêm đầu mới bắt đầu. Không có đồng hồ trong lúc đọc vai. Chủ phòng có thể hủy chia vai để về sảnh nếu có người không thể tiếp tục.
-- Kết quả bỏ phiếu được công bố trong 5 giây trước lượt tiếp theo và lưu để đọc lại trong ván, bao gồm hòa phiếu, phiếu trắng và Hoàng tử được miễn treo. Nếu Chán đời thắng, kết quả xuất hiện ngay ở màn kết thúc.
-- Tiên tri có lịch sử soi riêng theo đêm, giữ nguyên kết quả tại thời điểm soi và khôi phục khi kết nối lại. Lịch sử xóa khi về sảnh hoặc bắt đầu ván mới.
-- Khi mất kết nối, danh sách đánh dấu người offline và tạm khóa thao tác của người đó cho đến khi kết nối lại; offline không được tính là đồng ý bỏ qua ngày.
+Thiết kế cho khoảng **12–15 người chơi**, cho phép bắt đầu từ **1 đến 20 người**. Phòng 1–2 người dùng để thử thao tác; điều kiện thắng vẫn áp dụng nên ván có thể kết thúc rất nhanh. Phòng 3–5 người mặc định có 1 Sói, 1 Tiên tri và các Dân làng còn lại.
 
 ## Cách chơi
 
 - **Chat trực tiếp trong phòng**: chat chung mở ở sảnh, khi thảo luận/bỏ phiếu ban ngày và sau khi kết thúc. Người đã chết chỉ được đọc trong lúc ván đang diễn ra.
 - **Chat riêng bầy Sói**: chỉ Sói còn sống được xem, gửi vào ban đêm (bao gồm Sói trắng). Kẻ bị nguyền sau khi hóa Sói chỉ nhận tin riêng từ thời điểm gia nhập bầy. Tin riêng không gửi đến client phe khác, kể cả chủ phòng.
+- **Chat riêng Âm phủ 👻**: người đã mất có kênh chat riêng để trò chuyện với nhau bất cứ lúc nào (kể cả ban ngày), người còn sống không đọc được.
 - Mỗi kênh giữ tối đa 100 tin, mỗi tin tối đa 500 ký tự; lịch sử xóa khi bắt đầu/chơi lại. Khi mất mạng, cùng tab tự kết nối lại bằng mã phiên riêng và lấy lại lịch sử được phép đọc. Không chia sẻ dữ liệu phiên cho người khác.
-- Có thể dùng voice call ngoài web nếu muốn nói chuyện bằng giọng nói.
+- **Voice chat (giọng nói) 🎙️**: bấm "Bật mic" để nói chuyện trực tiếp bằng WebRTC (kết nối trực tiếp giữa các trình duyệt, không qua server lưu trữ âm thanh). Tự động chia 3 kênh theo trạng thái game — 🏘️ Làng (ban ngày, ai còn sống), 🐺 Bầy Sói (riêng tư ban đêm), 👻 Âm phủ (người đã mất) — giống hệt logic chat chữ ở trên. Có chấm sáng báo hiệu ai đang nói.
+- **Giọng dẫn chuyện 🔊**: tự động đọc to các mốc quan trọng ("Bầy Sói hãy dậy", "Tiên tri hãy dậy"...) bằng giọng đọc có sẵn của trình duyệt, có thể tắt bằng nút riêng.
+- **Nhạc nền 🎵** (tùy chọn): đổi nhạc ngày/đêm tự động nếu bạn tự thêm file MP3 (xem `public/sounds/README.md`), mặc định tắt.
 - Web app đóng vai trò **quản trò ảo**: tự động chia vai trò riêng tư cho từng người, dẫn dắt các lượt đêm (Sói cắn, Tiên tri soi, Phù thủy cứu/độc, Bảo vệ, Sói trắng, Cupid...), đếm ngược tự động chuyển pha, tổng hợp bỏ phiếu ban ngày, và báo thắng thua cuối game.
 - Mỗi người chơi tự mở link trên điện thoại/máy tính riêng của mình.
+- Tiên tri chọn mục tiêu rồi bấm **Soi người đã chọn**. Kết quả được lưu riêng trong **Kết quả soi của bạn**, hiện cả sau khi kết nối lại và ở màn hình kết thúc; ván mới sẽ xóa lịch sử cũ.
 - Khi có người chết, thông báo chỉ hiện tên, không công khai vai. Bảng tổng kết cuối ván vẫn hiển thị toàn bộ vai; các thông tin đã biết trước đó (đồng đội Sói, Hoàng tử đã lộ diện) không thể thu hồi.
 - Trong thời gian thảo luận, mỗi người còn sống có nút **Bỏ qua ngày → Đêm tiếp theo**. Khi tất cả người còn sống đồng ý (bao gồm người tạm mất kết nối), ván chuyển thẳng sang đêm và không treo cổ ai. Nếu chưa đủ đồng ý, hết giờ vẫn chuyển sang bỏ phiếu như thường lệ.
 
@@ -96,35 +94,32 @@ Web này là 1 server Node.js thông thường (Express + Socket.io), có thể 
 
 - `PORT`: cổng server lắng nghe (mặc định `3000`). Hầu hết các nền tảng (Railway, Render...) tự set biến này, không cần chỉnh gì thêm.
 
-### Giới hạn thao tác và phòng bỏ trống
-
-- Mỗi kết nối có tối đa 30 thao tác tích lũy, phục hồi 10 thao tác/giây. Thao tác sai hoặc lặp lại không làm đổi trạng thái sẽ không phát lại dữ liệu cả phòng.
-- Tạo/vào phòng được giới hạn thêm theo địa chỉ kết nối: tối đa 60 lượt tích lũy, phục hồi 2 lượt/giây. Khi dùng reverse proxy, giới hạn này có thể được dùng chung cho các kết nối qua proxy; cần tính đến điều này khi triển khai cho nhiều nhóm.
-- Phòng đang chơi mà không còn ai kết nối được giữ tối đa 5 phút. Có người vào lại trước thời hạn thì hủy lịch xóa. Hết thời hạn, phòng và bộ đếm giờ bị dọn; người chơi cần tạo phòng mới. Sảnh chờ rỗng vẫn được xóa ngay.
-- Nếu chủ phòng mất kết nối quá 30 giây, quyền chủ phòng chuyển sang một người đang online. Chủ mới có thể hủy chia vai để về sảnh; chủ cũ vào lại vẫn giữ vai của mình nhưng không tự lấy lại quyền chủ phòng.
-- Lựa chọn chỉ hiển thị đã gửi sau khi server xác nhận. Khi bị từ chối hoặc chờ quá 5 giây, có thể thử lại; khi kết nối lại, trạng thái bỏ phiếu được lấy từ server.
-
-### Kiểm tra giao diện
-
-`node scripts/visual-check.cjs` chạy Edge headless đã cài trên Windows, kiểm tra độ rộng 320/390/1366 px và một ván ba người qua luồng tạo phòng, đọc vai, xác nhận sẵn sàng, Sói hành động. Ảnh chụp lưu vào thư mục tạm được in ra. Có thể đặt `EDGE_PATH` nếu Edge ở đường dẫn khác. Chạy `npm test` cho bộ kiểm tra logic và Socket.IO.
-
 ## Cấu trúc code
 
 ```
 masoi-online/
   server/
-    index.js    -> Express + Socket.io, xử lý các sự kiện kết nối/phòng
+    index.js    -> Express + Socket.io, xử lý các sự kiện kết nối/phòng/voice signaling
     Game.js      -> Toàn bộ máy trạng thái game: pha đêm/ngày, hành động, thắng thua
     roles.js     -> Định nghĩa vai trò + công thức chia vai trò mặc định
+    Chat.js      -> Logic chat 3 kênh (chung / bầy Sói / Âm phủ), quyền đọc-gửi theo pha & tổ đội
+    voice.js     -> Tính kênh voice chat (village/wolves/dead) cho từng người theo trạng thái game
   public/
     index.html   -> Giao diện các màn hình (sảnh, lộ vai, trong game, kết thúc)
-    style.css
-    app.js       -> Logic client, giao tiếp Socket.io
+    style.css    -> Bao gồm theme sáng (ngày) / tối (đêm) tự chuyển theo pha
+    app.js       -> Logic client chính, giao tiếp Socket.io, chuyển theme ngày/đêm
+    chat.js      -> Giao diện chat 3 kênh
+    voice.js     -> WebRTC mesh: kết nối trực tiếp giữa các trình duyệt, mic bật/tắt
+    audio.js     -> Giọng dẫn chuyện (Text-to-Speech) + nhạc nền ngày/đêm, có bật/tắt
+    sounds/      -> Nơi tự thêm file nhạc nền MP3 (không đi kèm sẵn vì lý do bản quyền)
 ```
 
 ## Giới hạn hiện tại / hướng mở rộng thêm
 
-- Chat chữ đã có trong game; chưa hỗ trợ gọi thoại trực tiếp.
+- **Voice chat dùng WebRTC mesh (kết nối trực tiếp p2p)**: hoạt động tốt với vài người trong 1 kênh (ví dụ 2-4 Sói, hoặc vài người ở Âm phủ). Với kênh Làng đông người (10+ người cùng lúc), mỗi trình duyệt phải mở nhiều kết nối cùng lúc nên có thể hơi nặng máy/mạng yếu — cân nhắc vẫn dùng thêm Discord/Zoom ngoài nếu phòng đông và mạng không ổn định.
+- **WebRTC cần STUN/TURN để xuyên NAT**: code đang dùng STUN công cộng miễn phí của Google, đủ dùng cho phần lớn mạng nhà/mạng di động thông thường. Nếu một số người không nghe được nhau (mạng công ty, mạng chặn UDP...), cần tự thêm TURN server riêng (ví dụ dịch vụ metered.ca) vào `RTC_CONFIG` trong `public/voice.js`.
+- **Giọng dẫn chuyện** phụ thuộc vào giọng đọc tiếng Việt có sẵn trên trình duyệt/thiết bị của từng người — chất lượng có thể khác nhau, một số máy có thể không có giọng tiếng Việt và sẽ đọc bằng giọng mặc định khác.
+- **Nhạc nền cần bạn tự thêm file** — không có sẵn.
 - Vai trò được lưu trong bộ nhớ server (không dùng database) — nếu server restart giữa ván, các phòng đang chơi sẽ mất. Phù hợp cho các buổi chơi ngắn vài giờ.
 - Chưa có xác thực người dùng — bất kỳ ai có link + mã phòng đều vào được, phù hợp chơi với bạn bè.
 - Vì trạng thái vai trò gửi qua socket riêng cho từng người, một người chơi cố tình mở DevTools vẫn có thể xem được dữ liệu gửi tới đúng socket của họ (nhưng không thấy được vai trò người khác trừ khi cùng phe Sói).

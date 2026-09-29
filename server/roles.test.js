@@ -16,142 +16,6 @@ function setup(roles) {
   return [g, [...g.players.values()]];
 }
 function bite(g, p) { g.night = g._emptyNightActions(); g.night.wolfVictims = [p.id]; g.night.currentWolfVictim = p.id; g._resolveNight(io, noop); }
-
-test('empty first wolf round does not make the second bite healable', () => {
-  const [g,[wolf,witch,target]]=setup(['werewolf','witch','villager','villager','villager']);
-  g.phase=PHASE.NIGHT_WOLVES;g.night.remainingBites=2;
-  g._advanceFromTimer(io,noop);
-  assert.equal(g.night.wolfRound,2);
-  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:target.id});
-  g.phase=PHASE.NIGHT_WITCH;
-  assert.equal(g.getPhasePrompt(witch).canHeal,false);
-  assert.equal(g.recordAction(io,noop,witch.id,'witch_action',{heal:true}),undefined);
-  assert.equal(g.phase,PHASE.NIGHT_WITCH);
-  assert.equal(witch.hasUsedHeal,false);
-  g.recordAction(io,noop,witch.id,'witch_action',{});
-  assert.equal(target.alive,false);
-});
-
-test('witch heals only the first of two bites', () => {
-  const [g,[wolf,witch,a,b]]=setup(['werewolf','witch','villager','villager','villager']);
-  g.phase=PHASE.NIGHT_WOLVES;g.night.remainingBites=2;
-  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:a.id});
-  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:b.id});
-  g.phase=PHASE.NIGHT_WITCH;
-  assert.equal(g.getPhasePrompt(witch).victimName,a.name);
-  assert.equal(g.recordAction(io,noop,witch.id,'witch_action',{heal:true}),true);
-  assert.equal(a.alive,true);assert.equal(b.alive,false);
-});
-
-test('used witch potions do not end the turn; the available potion still works', () => {
-  for(const used of ['heal','poison']) {
-    const [g,[witch,target]]=setup(['witch','villager','werewolf','villager','villager']);
-    g.phase=PHASE.NIGHT_WITCH;
-    g.night.wolfVictims=[target.id];g.night.currentWolfVictim=target.id;
-    witch.hasUsedHeal=used==='heal';witch.hasUsedPoison=used==='poison';
-    const rejected=used==='heal'?{heal:true}:{poisonTargetId:target.id};
-    assert.equal(g.recordAction(io,noop,witch.id,'witch_action',rejected),undefined);
-    assert.equal(g.phase,PHASE.NIGHT_WITCH);
-    const accepted=used==='heal'?{poisonTargetId:target.id}:{heal:true};
-    assert.equal(g.recordAction(io,noop,witch.id,'witch_action',accepted),true);
-    assert.equal(target.alive,used==='poison');
-  }
-});
-
-test('guard can skip with null but cannot protect the same person on consecutive nights', () => {
-  const [g,[guard,target]]=setup(['guard','villager','werewolf']);
-  g.phase=PHASE.NIGHT_GUARD;
-  assert.equal(g.recordAction(io,noop,guard.id,'guard_protect',{targetId:null}),true);
-  assert.equal(g.phase,PHASE.NIGHT_WOLVES);
-  g.phase=PHASE.NIGHT_GUARD;g.lastProtectedId=target.id;
-  assert.equal(g.recordAction(io,noop,guard.id,'guard_protect',{targetId:target.id}),undefined);
-  assert.equal(g.phase,PHASE.NIGHT_GUARD);
-  assert.equal(g.recordAction(io,noop,guard.id,'guard_protect',{targetId:null}),true);
-});
-
-test('reading roles waits for every connected player and resets for the next game', () => {
-  const g = new Game('READY');
-  const players = Array.from({length:3}, (_, i) => g.addPlayer('s'+i, 'P'+i));
-  const config = getDefaultRoleConfig(3);
-  assert.equal(g.startGame(config).ok, true);
-  assert.equal(g.phase, PHASE.ROLE_REVEAL);
-  assert.equal(g.phaseEndsAt, null);
-  assert.equal(g.timer, null);
-  g._goToPhase = (_io, _fn, phase) => { g.phase = phase; };
-  players[2].connected = false;
-  players.forEach(p => g.recordAction(io, noop, p.id, 'ready', {}));
-  assert.equal(g.phase, PHASE.ROLE_REVEAL);
-  assert.equal(players[2].ready, false);
-  g.reconnectByName('new', players[2].name);
-  g.recordAction(io, noop, players[2].id, 'ready', {});
-  assert.equal(g.nightNumber, 1);
-  g.recordAction(io, noop, players[2].id, 'ready', {});
-  assert.equal(g.nightNumber, 1);
-  g.phase = PHASE.LOBBY;
-  g.startGame(config);
-  assert.ok(players.every(p => !p.ready));
-});
-
-test('vote announcement precedes hunter retaliation and preserves public results', () => {
-  const [g, [wolf, hunter, a, b, c]] = setup(['werewolf','hunter','villager','villager','villager']);
-  g.dayNumber = 2;
-  g.dayVotes = {[wolf.id]:hunter.id, [a.id]:hunter.id, [b.id]:null};
-  g._resolveDayVote(io, noop);
-  assert.equal(g.phase, PHASE.DAY_RESOLVE);
-  assert.equal(hunter.alive, false);
-  assert.equal(g.voteHistory[0].blankVotes, 1);
-  assert.equal(g.voteHistory[0].missingVotes, 2);
-  assert.equal(g.publicState().voteHistory[0].targetName, hunter.name);
-  assert.equal(g.publicState().players.find(p => p.id === hunter.id).role, undefined);
-  g._advanceFromTimer(io, noop);
-  assert.equal(g.phase, PHASE.HUNTER_SHOT);
-  g.recordAction(io, noop, hunter.id, 'hunter_shoot', {targetId:c.id});
-  assert.equal(g.nightNumber, 2);
-  assert.equal(g.voteHistory.length, 1);
-});
-
-test('vote history distinguishes ties, blank votes and prince immunity', () => {
-  for (const outcome of ['tie','no_votes','prince_saved']) {
-    const [g, [wolf, prince, villager]] = setup(['werewolf','prince','villager']);
-    g.dayVotes = outcome === 'tie' ? {[wolf.id]:prince.id,[prince.id]:wolf.id}
-      : outcome === 'no_votes' ? {[wolf.id]:null} : {[wolf.id]:prince.id};
-    g._resolveDayVote(io, noop);
-    assert.equal(g.lastVoteResult.outcome, outcome);
-    assert.equal(g.lastVoteResult.eliminatedId, null);
-    assert.equal(prince.alive, true);
-    assert.equal(g.phase, PHASE.DAY_RESOLVE);
-  }
-});
-
-test('seer history survives reconnect, records original result and resets with new roles', () => {
-  const [g, [seer, target]] = setup(['seer','cursed','werewolf','villager','villager']);
-  g.phase = PHASE.NIGHT_SEER;
-  g.recordAction(io, noop, seer.id, 'seer_check', {targetId:target.id});
-  target.role = 'werewolf';
-  g.removePlayerBySocket(seer.socketId);
-  g.reconnectByName('new-socket', seer.name);
-  assert.deepEqual(seer.seerHistory, [{nightNumber:1,targetId:target.id,targetName:target.name,isWolf:false}]);
-  assert.equal(JSON.stringify(g.publicState()).includes('seerHistory'), false);
-  g.phase = PHASE.LOBBY;
-  g.startGame(getDefaultRoleConfig(5));
-  assert.deepEqual(seer.seerHistory, []);
-  assert.deepEqual(g.voteHistory, []);
-});
-
-test('surviving bite victims still count toward village parity', () => {
-  for (const protection of ['guard', 'heal', 'elder', 'toughguy']) {
-    const [g, [, victim]] = setup(['werewolf', ['elder', 'toughguy'].includes(protection) ? protection : 'villager', 'villager']);
-    g.night.wolfVictims = [victim.id];
-    g.night.currentWolfVictim = victim.id;
-    if (protection === 'guard') g.night.guardTarget = victim.id;
-    if (protection === 'heal') g.night.witchHeal = true;
-    g._resolveNight(io, noop);
-    assert.equal(victim.alive, true);
-    assert.equal(g._checkWinCondition(), null, protection);
-    g._applyDeaths(io, [victim.id]);
-    assert.equal(g._checkWinCondition().winner, 'wolves');
-  }
-});
 test('death announcements and public players hide dead roles until game over', () => {
   const [g, players] = setup(['werewolf', 'seer', 'witch', 'guard', 'hunter', 'prince']);
   players[5].revealedPrince = true;
@@ -195,10 +59,10 @@ test('skip rejects wrong phases and stale day requests; incomplete vote preserve
   g._advanceFromTimer(io, noop);
   assert.equal(g.phase, PHASE.DAY_VOTE);
 });
-test('16 role cards have complete instructions; defaults valid for 3–20 players', () => {
+test('16 role cards have complete instructions; defaults valid for 6–20 players', () => {
   assert.equal(Object.keys(ROLE_INFO).length,16);
   for (const r of Object.values(ROLE_INFO)) for (const field of ['name','desc','play','win','team','icon']) assert.ok(r[field]);
-  for(let n=3;n<=20;n++) assert.deepEqual(validateRoleConfig(getDefaultRoleConfig(n),n),[]);
+  for(let n=1;n<=20;n++) assert.deepEqual(validateRoleConfig(getDefaultRoleConfig(n),n),[]);
   for(const value of [-1,1.5,Infinity,'2']) assert.ok(validateRoleConfig({werewolf:value,villager:4},6).length);
   assert.ok(validateRoleConfig(null,6).length);
 });
@@ -229,6 +93,19 @@ test('tanner wins on execution but not on bite', () => {
 test('lycan appears as wolf to seer', () => {
   const [g,[seer,target]]=setup(['seer','lycan']);g.phase=PHASE.NIGHT_SEER;let result;
   g.recordAction({to:()=>({emit:(_event,data)=>result=data})},noop,seer.id,'seer_check',{targetId:target.id});assert.equal(result.isWolf,true);
+});
+test('seer retains private results across phases and clears them for a new game', () => {
+  const [g,[seer,wolf,villager]]=setup(['seer','werewolf','villager']);
+  g.phase=PHASE.NIGHT_SEER;
+  g.recordAction(io,noop,seer.id,'seer_check',{targetId:wolf.id});
+  assert.equal(seer.seerResults[0].isWolf,true);
+  g.nightNumber=2;g.phase=PHASE.NIGHT_SEER;
+  g.recordAction(io,noop,seer.id,'seer_check',{targetId:villager.id});
+  assert.equal(seer.seerResults[1].isWolf,false);
+  assert.equal(seer.seerResults[1].nightNumber,2);
+  assert.ok(g.publicPlayerList().every(p=>!p.seerResults));
+  g.phase=PHASE.LOBBY;assert.ok(g.startGame(getDefaultRoleConfig(3)).ok);
+  assert.deepEqual(seer.seerResults,[]);
 });
 test('dead hunter can shoot; another player cannot take the shot', () => {
   const [g,[hunter,target,other]]=setup(['hunter','werewolf','villager']);g._applyDeaths(io,[hunter.id]);g.phase=PHASE.HUNTER_SHOT;

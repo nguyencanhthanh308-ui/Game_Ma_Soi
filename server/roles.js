@@ -249,7 +249,13 @@ function validateRoleConfig(config, n) {
   if (total !== n) {
     errors.push(`Tong so vai tro (${total}) phai bang so nguoi choi (${n})`);
   }
-  const wolfTotal = (config.werewolf || 0) + (config.wolfcub || 0) + (config.whitewolf || 0);
+  // Chi cong nhung gia tri da qua kiem tra o vong lap tren. Doc thang config[key] se ep kieu
+  // mot object nguoi dung gui len (vi du {valueOf:null}) va lam ham nay nem loi.
+  const safeCount = (key) => {
+    const val = config[key];
+    return Number.isSafeInteger(val) && val >= 0 ? val : 0;
+  };
+  const wolfTotal = safeCount('werewolf') + safeCount('wolfcub') + safeCount('whitewolf');
   if (n > 1 && wolfTotal < 1) {
     errors.push('Can it nhat 1 Soi trong game');
   }

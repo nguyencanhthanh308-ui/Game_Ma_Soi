@@ -298,11 +298,14 @@ class Game {
     if (!player.alive) return;
     if (type === 'skip_day') {
       if (this.phase !== PHASE.DAY_DISCUSSION || payload.dayNumber !== this.dayNumber) return;
+      if (this.skipDayVotes.has(player.id)) return; // bam lai lan nua khong doi gi, dung phat lai state
       this.skipDayVotes.add(player.id);
       if (this.alivePlayers().every(p => this.skipDayVotes.has(p.id))) {
         this.lastVoteResult = { eliminatedId: null, tally: {} };
-        this._afterDayFlow(io, broadcastFn);
+        this._afterDayFlow(io, broadcastFn); // ham nay tu broadcast khi sang pha moi
+        return;
       }
+      broadcastFn(); // cap nhat dem "x/y nguoi dong y" cho moi nguoi
       return;
     }
     const prompt = this.getPhasePrompt(player);
@@ -378,7 +381,12 @@ class Game {
           this.night.witchHeal = true;
           player.hasUsedHeal = true;
         }
-        if (!player.hasUsedPoison) return;
+        if (!player.hasUsedPoison) {
+          // Con binh doc: phat lai state de phu thuy nhan prompt buoc 'poison'.
+          // Thieu dong nay thi phu thuy dung yen o buoc 'heal' cho den khi het gio.
+          broadcastFn();
+          return;
+        }
         this._resolveNight(io, broadcastFn);
         return;
       }

@@ -377,3 +377,90 @@ h1, #role-name, .brand, .entry-card h2, .room-chat h3, .world-facts strong {
 .screen.chat-layout { flex-wrap:wrap; }
 @media(min-width:960px) { .room-voice { flex:0 0 260px; } }
 * { scrollbar-width:thin; scrollbar-color:var(--accent-2) var(--bg-card); }
+
+/* ==========================================================================
+   THEME BAN NGAY
+   app.js gan .theme-day cho <html> o cac pha DAY_*, .theme-night o cac pha con lai
+   trong van. Sanh cho va man ket thuc khong mang class nao nen giu nguyen tong toi.
+   Khoi nay ghi de ca cac token mau lan nhung ma mau toi viet cung trong CSS o tren,
+   vi chung khong doc tu bien.
+   ========================================================================== */
+:root.theme-day {
+  color-scheme: light;
+  --bg: #e7dcc2;
+  --bg-card: #fdf6e6;
+  --accent: #b06a2c;
+  --accent-2: #8d4f1f;
+  --text: #2a2318;
+  --text-dim: #6f6249;
+  --wolf: #a8442a;
+  --village: #2f7d6a;
+  --border: #d2bf98;
+  --input-bg: #fffaee;
+  --surface-2: #e8dabb;
+  --message-bg: #f0e4c8;
+  --selected-bg: #e3c795;
+}
+
+/* Chuyen canh binh minh / hoang hon muot thay vi nhay mau dot ngot */
+body { transition: background .6s ease, color .6s ease; }
+
+:root.theme-day body {
+  background: radial-gradient(ellipse at 23% 30%, #fff6dd 0, transparent 60%), var(--bg);
+}
+/* Lop nhieu la cac cham trang - tren nen sang phai dao nguoc thanh cham toi moi thay */
+:root.theme-day body::before { opacity: .05; filter: invert(1); }
+
+/* --- Khung tranh pixel ngoi lang --- */
+:root.theme-day .village-frame { border-color: #b9a87e; background: #cfc5a3; box-shadow: 0 14px 45px #6b552b26; }
+:root.theme-day .village-frame::after { border-color: #5a441c1a; }
+:root.theme-day .scene-caption { background: #e6d9b6; color: #5c5137; }
+:root.theme-day .scene-caption span:last-child { color: #8d5a17; }
+:root.theme-day .scene-footer { background: #e9ddbd; color: var(--text-dim); }
+:root.theme-day .village-phase-caption { background: #fdf6e6e6; color: #4a3a1f; }
+
+/* --- Khung the, bang dieu khien --- */
+:root.theme-day .card { background: linear-gradient(145deg, #fdf6e6, #f3e8cf); border-color: #cdb98f; box-shadow: 0 18px 50px #6b552b1f, inset 0 1px #fffdf6; }
+:root.theme-day .entry-card { border-top-color: var(--accent); }
+:root.theme-day .entry-card::before { background: #fdf6e6; }
+:root.theme-day .entry-divider span { background: #f8efd9; color: #7d6f52; }
+:root.theme-day .room-chat { background: #fbf3e0; border-color: #cdb98f; box-shadow: 0 15px 40px #6b552b1a; }
+:root.theme-day .room-voice { background: var(--bg-card); }
+:root.theme-day .history-panel { background: #f2e7cd; }
+:root.theme-day .phase-badge { background: #f1e5c9; border-color: #cdb98f; }
+:root.theme-day .phase-message { background: #efe2c4; }
+
+/* --- Danh sach nguoi choi, muc tieu --- */
+:root.theme-day .player-list li { background: #f6ecd5; border-color: #cdb98f; }
+:root.theme-day .player-list li.me { border-color: var(--accent); }
+:root.theme-day .target-btn { background: #f4e9d1; border-color: #c6b183; color: var(--text); }
+:root.theme-day .target-btn.selected { background: var(--selected-bg); border-color: var(--accent); }
+:root.theme-day .tag { background: #e3ecd8; border-color: #9fb488; color: #3c5233; }
+
+/* --- Nut, o nhap --- */
+:root.theme-day .btn-primary {
+  color: #2a1d0c;
+  background: linear-gradient(110deg, #e0a951, #c5853a);
+  border-color: #eec98d;
+  box-shadow: 0 3px 0 #8a5a24;
+}
+:root.theme-day .btn-primary:hover:not(:disabled) { background: #ecbd72; }
+:root.theme-day .btn-secondary { color: #3b3323; background: #e8dabb; border-color: #c6b183; }
+:root.theme-day .btn-secondary:hover:not(:disabled) { background: #dfcda6; }
+:root.theme-day .role-config-grid .stepper button { background: #e8dabb; border-color: #c6b183; }
+:root.theme-day input[type='text'] { background: var(--input-bg); border-color: #c6b183; color: var(--text); }
+:root.theme-day input::placeholder { color: #9a8c6d; }
+:root.theme-day label { color: #5f5540; }
+
+/* --- Chat --- */
+:root.theme-day .chat-messages { background: #fffaee; border-color: #d6c49d; }
+:root.theme-day .chat-quote, :root.theme-day .chat-reply-preview { background: #f0e4c8; }
+:root.theme-day .toast { background: #3f4a33; border-color: #6d7a55; color: #f6f1de; }
+
+/* --- Man lo vai tro (co the mo de trong van) --- */
+:root.theme-day #role-portrait { background: #efe4c7; outline-color: var(--accent); }
+:root.theme-day .role-label details { border-bottom-color: #d6c49d; }
+/* Bang bao mat ket noi: ban ngay dung nen do nhat cho khop nen sang */
+:root.theme-day #connection-status { background: #f7dcd8; border-bottom-color: #c0392b; color: #86271c; }
+/* #ff8080 la do nhat, doc tren nen giay se khong ro -> dam lai cho du tuong phan */
+:root.theme-day .error-text { color: #9e2b1e; }

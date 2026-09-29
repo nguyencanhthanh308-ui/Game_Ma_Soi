@@ -521,7 +521,12 @@ socket.on('game_state', (gs) => {
   window.villageArt?.update(gs);
 
   // Ban ngay nen sang, ban dem nen toi + doc dan chuyen khi vua chuyen sang mot pha moi
-  document.documentElement?.classList?.toggle('theme-night', gs.phase.startsWith('NIGHT_'));
+  // Cung mot moc "ban ngay" voi tranh pixel trong village.js (chi cac pha DAY_* la sang).
+  // Sanh cho va man ket thuc khong mang class nao, giu nguyen tong toi cua giao dien.
+  const isDay = gs.phase.startsWith('DAY_');
+  const inGame = gs.phase !== 'LOBBY' && gs.phase !== 'GAME_OVER';
+  document.documentElement?.classList?.toggle('theme-day', inGame && isDay);
+  document.documentElement?.classList?.toggle('theme-night', inGame && !isDay);
   if (prevPhase !== gs.phase) window.gameAudio?.onPhaseChange(gs.phase);
 
   if (gs.phase === 'LOBBY') {

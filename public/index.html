@@ -11,6 +11,10 @@
   <header class="site-header">
     <div class="brand"><span class="brand-moon" aria-hidden="true">◒</span><div>TRĂNG KHUYẾT<small>MA SÓI ONLINE</small></div></div>
     <span class="header-note">Một ngôi làng. Nhiều bí mật.</span>
+    <div class="audio-settings" aria-label="Âm thanh">
+      <button id="btn-toggle-narrator" class="btn-secondary small" aria-pressed="true">🔊 Dẫn chuyện: Bật</button>
+      <button id="btn-toggle-music" class="btn-secondary small" aria-pressed="false">🎵 Nhạc nền: Tắt</button>
+    </div>
     <span class="edition">PIXEL EDITION <span aria-hidden="true">✦</span></span>
   </header>
   <div id="app">
@@ -174,10 +178,6 @@
     <button id="btn-toggle-mic" class="btn-primary small">🎤 Bật mic</button>
     <p id="voice-hint" class="hint-text"></p>
     <ul id="voice-peer-list" class="voice-peer-list"></ul>
-    <div class="voice-settings">
-      <button id="btn-toggle-narrator" class="btn-secondary small" aria-pressed="true">🔊 Dẫn chuyện: Bật</button>
-      <button id="btn-toggle-music" class="btn-secondary small" aria-pressed="false">🎵 Nhạc nền: Tắt</button>
-    </div>
   </section>
 
   <section id="room-chat" class="room-chat hidden" aria-label="Trò chuyện trong phòng">

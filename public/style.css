@@ -497,3 +497,39 @@ body { transition: background .6s ease, color .6s ease; }
 #shared-role-config { text-align: left; }
 /* Ngoai phong choi thi ca hai khung deu .hidden -> an luon cot de no khong chiem cho */
 .room-side:not(:has(> section:not(.hidden))) { display: none; }
+
+/* ---- Giu o nhap chat luon trong tam mat tren man hinh rong ----
+   Cot ben phai (voice + chat) cao hon man hinh nen position:sticky khong an thua:
+   phai cuon xuong het trang moi thay o nhap va nut Gui. Gioi han cot trong chieu cao
+   khung nhin, roi cho danh sach tin nhan co lai de phan soan tin luon nam duoi cung. */
+@media (min-width: 960px) {
+  .room-side { max-height: calc(100svh - 48px); overflow-y: auto; }
+
+  /* Khung voice cao tu nhien toi 427px, an het cho cua khung chat. Cho no co lai va
+     tu cuon ben trong: nut mic va ten kenh van o tren cung, danh sach nguoi cuon duoi. */
+  .room-side > .room-voice { flex: 0 1 auto; min-height: 130px; overflow-y: auto; }
+
+  /* Khung chat khong bi co xuong duoi muc con doc duoc, nho vay phan soan tin
+     luon nam trong khung nhin ma khong phai cuon xuong cuoi trang. */
+  /* Khong dat min-height:0 o day: can giu chieu cao toi thieu tu nhien cua khung chat
+     (tieu de + danh sach toi thieu + khung soan tin) de flexbox khong ep no nho hon
+     noi dung, khien phan soan tin bi day ra ngoai. */
+  .room-side > .room-chat { display: flex; flex-direction: column; flex: 1 1 auto; }
+  /* height co dinh o tren se chan viec co lai -> tra ve auto va cho no chiem phan trong */
+  .room-side > .room-chat .chat-messages { flex: 1 1 auto; height: auto; min-height: 110px; }
+  .room-side > .room-chat .chat-form { flex: 0 0 auto; }
+}
+
+/* Phong dong nguoi thi danh sach nay dai ra vo han, keo tut o nhap chat xuong duoi */
+.voice-peer-list { max-height: 148px; overflow-y: auto; }
+
+/* ---- Hai nut am thanh nam tren header ----
+   Truoc day chung nam cuoi khung voice; khi khung voice co lai tren man hinh thap
+   thi bi day vao vung cuon ben trong, kho bam. Tren header thi luc nao cung thay. */
+.audio-settings { display: flex; gap: 8px; flex-shrink: 0; }
+.audio-settings button { margin: 0; width: auto; min-height: 38px; padding: 8px 12px; font-size: 11px; white-space: nowrap; }
+.site-header { flex-wrap: wrap; row-gap: 10px; }
+@media (max-width: 760px) {
+  .audio-settings { order: 3; width: 100%; }
+  .audio-settings button { flex: 1 1 auto; }
+}

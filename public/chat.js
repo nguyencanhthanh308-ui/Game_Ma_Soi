@@ -25,7 +25,7 @@
     if (recording) return stopRecording();
     if (askingMic || !snapshot?.permissions[channel]?.canSend) return;
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      $('chat-error').textContent = 'Ghi voice cần HTTPS và trình duyệt hỗ trợ micro.'; return;
+      $('chat-error').textContent = 'Ghi âm cần HTTPS và trình duyệt hỗ trợ micro.'; return;
     }
     askingMic = true;
     const sentChannel = channel;
@@ -37,7 +37,7 @@
         stream.getTracks().forEach(t => t.stop()); return;
       }
       const mime = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'].find(t => MediaRecorder.isTypeSupported(t));
-      if (!mime) throw new Error('Trình duyệt không hỗ trợ định dạng voice phù hợp.');
+      if (!mime) throw new Error('Trình duyệt không hỗ trợ định dạng ghi âm phù hợp.');
       const recorder = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 24000 });
       const job = { recorder, stream, cancelled: false, channel: sentChannel, phase: sentPhase };
       recording = job;
@@ -48,24 +48,24 @@
         clearTimeout(job.timer);
         stream.getTracks().forEach(t => t.stop());
         recording = null;
-        $('chat-record').textContent = '🎙 Ghi voice (20 giây)';
+        $('chat-record').textContent = '🎙 Ghi âm (20 giây)';
         $('chat-record-cancel').classList.add('hidden');
         if (job.cancelled || !socket.connected || !snapshot.permissions[sentChannel]?.canSend) return;
         const blob = new Blob(chunks, { type: mime });
-        if (!blob.size || blob.size > 130000) { $('chat-error').textContent = 'Voice quá lớn hoặc rỗng. Hãy ghi ngắn hơn.'; return; }
+        if (!blob.size || blob.size > 130000) { $('chat-error').textContent = 'Bản ghi âm quá lớn hoặc rỗng. Hãy ghi ngắn hơn.'; return; }
         const reader = new FileReader();
         reader.onload = () => socket.timeout(8000).emit('chat_send', {
           channel: sentChannel, audio: { mime, base64: reader.result.split(',')[1] },
-        }, (error, result) => { $('chat-error').textContent = error ? 'Chưa xác nhận gửi voice.' : result?.ok ? '' : result?.error || 'Không gửi được voice.'; });
+        }, (error, result) => { $('chat-error').textContent = error ? 'Chưa xác nhận gửi ghi âm.' : result?.ok ? '' : result?.error || 'Không gửi được ghi âm.'; });
         reader.readAsDataURL(blob);
       };
       recorder.start();
       job.timer = setTimeout(() => stopRecording(), 20000);
-      $('chat-record').textContent = '⏹ Dừng và gửi voice';
+      $('chat-record').textContent = '⏹ Dừng và gửi ghi âm';
       $('chat-record-cancel').classList.remove('hidden');
     } catch (error) {
       stream?.getTracks().forEach(t => t.stop());
-      $('chat-error').textContent = 'Không ghi được voice: ' + error.message;
+      $('chat-error').textContent = 'Không ghi âm được: ' + error.message;
     } finally { askingMic = false; }
   });
 
@@ -150,11 +150,11 @@
         if (message.audio) {
           const play = document.createElement('button');
           play.className = 'btn-secondary small';
-          play.textContent = '▶ Nghe voice';
+          play.textContent = '▶ Nghe ghi âm';
           play.addEventListener('click', () => {
             play.disabled = true;
             socket.timeout(8000).emit('chat_audio', message.id, (error, result) => {
-              if (error || !result?.ok) { play.disabled = false; play.textContent = 'Thử tải voice lại'; return; }
+              if (error || !result?.ok) { play.disabled = false; play.textContent = 'Thử tải lại ghi âm'; return; }
               const audio = document.createElement('audio');
               audio.controls = true;
               audio.src = `data:${result.audio.mime};base64,${result.audio.base64}`;

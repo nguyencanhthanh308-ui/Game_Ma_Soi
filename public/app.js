@@ -138,7 +138,7 @@ socket.on('connect', function tryAutoRejoin() {
 
 $('btn-share').addEventListener('click', () => {
   const url = location.origin + '?room=' + state.roomCode;
-  navigator.clipboard?.writeText(url).then(() => toast('Đã copy link mời!')).catch(() => toast(url));
+  navigator.clipboard?.writeText(url).then(() => toast('Đã sao chép liên kết mời!')).catch(() => toast(url));
 });
 
 $('btn-suggest').addEventListener('click', () => {

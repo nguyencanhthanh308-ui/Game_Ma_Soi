@@ -15,7 +15,7 @@
       <button id="btn-toggle-narrator" class="btn-secondary small" aria-pressed="true">🔊 Dẫn chuyện: Bật</button>
       <button id="btn-toggle-music" class="btn-secondary small" aria-pressed="false">🎵 Nhạc nền: Tắt</button>
     </div>
-    <span class="edition">PIXEL EDITION <span aria-hidden="true">✦</span></span>
+    <span class="edition">PHIÊN BẢN PIXEL <span aria-hidden="true">✦</span></span>
   </header>
   <div id="app">
     <p id="connection-status" class="error-text hidden" role="status">Mất kết nối. Đang kết nối lại…</p>
@@ -23,7 +23,7 @@
     <!-- MAN HINH: NHAP TEN / TAO PHONG / VAO PHONG -->
     <section id="screen-home" class="screen active">
       <div class="home-world">
-        <p class="eyebrow"><span class="status-dot"></span> GAME SUY LUẬN CÙNG BẠN BÈ</p>
+        <p class="eyebrow"><span class="status-dot"></span> TRÒ CHƠI SUY LUẬN CÙNG BẠN BÈ</p>
         <h1>Khi đêm xuống,<br>ai là <em>Sói?</em></h1>
         <p class="world-intro">Giữa những gương mặt quen thuộc, một bí mật đang ẩn mình.<br class="desktop-break"> Thắp lửa, gọi bạn bè và bước vào ngôi làng.</p>
         <div class="village-frame home-village">
@@ -75,11 +75,11 @@
             <div class="room-code-label">Mã phòng</div>
             <div id="room-code-display" class="room-code"></div>
           </div>
-          <button id="btn-share" class="btn-secondary small">📋 Copy link mời</button>
+          <button id="btn-share" class="btn-secondary small">📋 Sao chép liên kết mời</button>
         </div>
 
         <div id="share-fallback" class="hidden">
-          <label for="share-url">Sao chép link này để mời bạn bè</label>
+          <label for="share-url">Sao chép liên kết này để mời bạn bè</label>
           <input id="share-url" type="text" readonly />
         </div>
         <h3>Người chơi (<span id="player-count">0</span>)</h3>
@@ -114,7 +114,7 @@
           <p class="hint-text">Luật áp dụng trong phòng này. Giữ bí mật lá bài của bạn.</p>
           <div id="role-extra" class="role-extra"></div>
         </div>
-        <button id="btn-continue" class="btn-primary">Tôi đã rõ, vào game!</button>
+        <button id="btn-continue" class="btn-primary">Tôi đã rõ, vào ván chơi!</button>
         <p id="ready-status" class="hint-text" role="status"></p>
         <button id="btn-cancel-ready" class="btn-secondary hidden">Hủy chia vai, về sảnh</button>
       </div>
@@ -172,12 +172,12 @@
   <div id="toast" class="toast hidden"></div>
 
   <div id="room-side" class="room-side">
-  <section id="room-voice" class="room-voice hidden" aria-label="Voice chat trong phòng">
+  <section id="room-voice" class="room-voice hidden" aria-label="Trò chuyện thoại trong phòng">
     <div class="voice-head">
-      <h3>🎙️ Voice chat</h3>
-      <button id="btn-toggle-mic" class="btn-primary small">🎤 Bật mic</button>
+      <h3>🎙️ Trò chuyện thoại</h3>
+      <button id="btn-toggle-mic" class="btn-primary small">🎤 Bật micro</button>
     </div>
-    <p id="voice-channel-label" class="voice-channel-label">🔇 Không có kênh voice lúc này</p>
+    <p id="voice-channel-label" class="voice-channel-label">🔇 Không có kênh thoại lúc này</p>
     <p id="voice-hint" class="hint-text"></p>
     <ul id="voice-peer-list" class="voice-peer-list"></ul>
   </section>
@@ -185,7 +185,7 @@
   <section id="room-chat" class="room-chat hidden" aria-label="Trò chuyện trong phòng">
     <p class="eyebrow">NHỮNG LỜI THÌ THẦM</p>
     <h3>Chuyện trong làng</h3>
-    <div class="chat-channels" aria-label="Chọn kênh chat">
+    <div class="chat-channels" aria-label="Chọn kênh trò chuyện">
       <button id="chat-public" type="button" class="btn-secondary small" aria-pressed="true">Phòng chung</button>
       <button id="chat-wolves" type="button" class="btn-secondary small hidden" aria-pressed="false">🐺 Bầy Sói · riêng tư</button>
       <button id="chat-dead" type="button" class="btn-secondary small hidden" aria-pressed="false">👻 Âm phủ · riêng tư</button>
@@ -201,7 +201,7 @@
       <label for="chat-input" class="chat-input-label">Tin nhắn vào phòng chung</label>
       <input id="chat-input" type="text" maxlength="500" autocomplete="off" placeholder="Nhập tin nhắn…" />
       <button id="chat-send" class="btn-primary small" type="submit">Gửi</button>
-      <button id="chat-record" class="btn-secondary small" type="button">🎙 Ghi voice (20 giây)</button>
+      <button id="chat-record" class="btn-secondary small" type="button">🎙 Ghi âm (20 giây)</button>
       <button id="chat-record-cancel" class="btn-secondary small hidden" type="button">Hủy ghi</button>
     </form>
     <p id="chat-error" class="error-text" role="status"></p>

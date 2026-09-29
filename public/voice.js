@@ -20,7 +20,7 @@
     village: 'Mọi người còn sống đều nghe và nói được ở đây.',
     wolves: 'Chỉ bầy Sói còn sống nghe được nhau lúc này.',
     dead: 'Chỉ những người đã mất mới vào được kênh này, có thể nói chuyện thoải mái.',
-    null: 'Hiện không có kênh voice nào đang mở (đang là lượt riêng của một vai trò khác).',
+    null: 'Hiện không có kênh thoại nào đang mở (đang là lượt riêng của một vai trò khác).',
   };
 
   const v = {
@@ -45,7 +45,7 @@
   }
 
   function updateLabels() {
-    channelLabel.textContent = CHANNEL_LABEL[v.channel] || '🔇 Không có kênh voice lúc này';
+    channelLabel.textContent = CHANNEL_LABEL[v.channel] || '🔇 Không có kênh thoại lúc này';
     hint.textContent = CHANNEL_HINT[v.channel] || CHANNEL_HINT.null;
     micBtn.disabled = !v.channel;
   }
@@ -120,7 +120,7 @@
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           socket.emit('voice_signal', { toPlayerId: peerId, data: { type: 'offer', sdp: pc.localDescription } });
-        } catch (err) { console.error('Loi tao offer voice:', err); }
+        } catch (err) { console.error('Lỗi tạo kết nối thoại:', err); }
       })();
     }
     return pc;
@@ -174,10 +174,10 @@
         return;
       }
       v.micOn = true;
-      micBtn.textContent = '🔴 Tắt mic';
+      micBtn.textContent = '🔴 Tắt micro';
     } else {
       v.micOn = false;
-      micBtn.textContent = '🎤 Bật mic';
+      micBtn.textContent = '🎤 Bật micro';
       if (v.localStream) {
         v.localStream.getTracks().forEach((t) => t.stop());
         v.localStream = null;

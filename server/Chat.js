@@ -19,13 +19,13 @@ class Chat {
       public: {
         canRead: true,
         canSend: PUBLIC_PHASES.has(game.phase) && (!active || player.alive),
-        reason: active && !player.alive ? 'Bạn đã mất, chỉ có thể đọc chat chung.'
-          : !PUBLIC_PHASES.has(game.phase) ? 'Chat chung mở khi thảo luận và bỏ phiếu ban ngày.' : '',
+        reason: active && !player.alive ? 'Bạn đã mất, chỉ có thể đọc kênh chung.'
+          : !PUBLIC_PHASES.has(game.phase) ? 'Kênh chung mở khi thảo luận và bỏ phiếu ban ngày.' : '',
       },
       wolves: {
         canRead: wolves,
         canSend: wolves && game.phase.startsWith('NIGHT_'),
-        reason: 'Chat riêng của bầy Sói mở vào ban đêm.',
+        reason: 'Kênh riêng của bầy Sói mở vào ban đêm.',
       },
       dead: {
         canRead: dead,
@@ -63,7 +63,7 @@ class Chat {
       const { mime, base64 } = data.audio;
       if (!['audio/webm', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'].includes(mime) ||
           typeof base64 !== 'string' || base64.length > 180000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) {
-        return { ok: false, error: 'Voice không hợp lệ hoặc quá lớn (tối đa 20 giây / 130 KB).' };
+        return { ok: false, error: 'Ghi âm không hợp lệ hoặc quá lớn (tối đa 20 giây / 130 KB).' };
       }
       audio = { mime, base64 };
     }

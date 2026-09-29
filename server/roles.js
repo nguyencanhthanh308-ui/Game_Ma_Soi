@@ -235,19 +235,19 @@ function validateRoleConfig(config, n) {
   let total = 0;
   for (const key of Object.keys(config)) {
     if (!Object.hasOwn(ROLE_INFO, key)) {
-      errors.push(`Vai tro khong hop le: ${key}`);
+      errors.push(`Vai trò không hợp lệ: ${key}`);
       continue;
     }
     const val = config[key];
     if (!Number.isSafeInteger(val) || val < 0 || val > n) { errors.push(`Số lượng ${ROLE_INFO[key].name} phải là số nguyên từ 0 đến ${n}`); continue; }
-    if (val < 0) errors.push(`So luong "${ROLE_INFO[key].name}" khong the am`);
+    if (val < 0) errors.push(`Số lượng "${ROLE_INFO[key].name}" không thể âm`);
     if (SINGLE_ONLY_ROLES.includes(key) && val > 1) {
-      errors.push(`Vai tro "${ROLE_INFO[key].name}" chi duoc phep toi da 1 nguoi`);
+      errors.push(`Vai trò "${ROLE_INFO[key].name}" chỉ được phép tối đa 1 người`);
     }
     total += val;
   }
   if (total !== n) {
-    errors.push(`Tong so vai tro (${total}) phai bang so nguoi choi (${n})`);
+    errors.push(`Tổng số vai trò (${total}) phải bằng số người chơi (${n})`);
   }
   // Chi cong nhung gia tri da qua kiem tra o vong lap tren. Doc thang config[key] se ep kieu
   // mot object nguoi dung gui len (vi du {valueOf:null}) va lam ham nay nem loi.
@@ -257,10 +257,10 @@ function validateRoleConfig(config, n) {
   };
   const wolfTotal = safeCount('werewolf') + safeCount('wolfcub') + safeCount('whitewolf');
   if (n > 1 && wolfTotal < 1) {
-    errors.push('Can it nhat 1 Soi trong game');
+    errors.push('Cần ít nhất 1 Sói trong ván chơi');
   }
   if (n >= 3 && wolfTotal * 2 >= n) {
-    errors.push('So luong Soi qua nhieu so voi Dan lang, hay giam bot');
+    errors.push('Số lượng Sói quá nhiều so với Dân làng, hãy giảm bớt');
   }
   return errors;
 }

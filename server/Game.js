@@ -93,7 +93,7 @@ class Game {
     const player = {
       id,
       socketId,
-      name: name.trim().slice(0, 20) || 'Nguoi choi',
+      name: name.trim().slice(0, 20) || 'Người chơi',
       isHost,
       connected: true,
       alive: true,
@@ -591,21 +591,21 @@ class Game {
     const whitewolf = alive.find((p) => p.role === 'whitewolf');
 
     if (whitewolf && alive.length === 1) {
-      return { winner: 'whitewolf', reason: 'Soi trang la nguoi song sot cuoi cung' };
+      return { winner: 'whitewolf', reason: 'Sói trắng là người sống sót cuối cùng' };
     }
 
     if (alive.length === 2 && alive[0].loverId === alive[1].id) {
-      return { winner: 'lovers', reason: 'Cap doi yeu nhau la 2 nguoi song sot cuoi cung' };
+      return { winner: 'lovers', reason: 'Cặp đôi yêu nhau là 2 người sống sót cuối cùng' };
     }
 
     const wolfTeam = alive.filter((p) => isWolfTeam(p.role));
     const villageTeam = alive.filter((p) => !isWolfTeam(p.role) && !this.night.wolfVictims.includes(p.id));
 
     if (wolfTeam.length === 0) {
-      return { winner: 'village', reason: 'Tat ca Soi da bi tieu diet' };
+      return { winner: 'village', reason: 'Tất cả Sói đã bị tiêu diệt' };
     }
     if (!whitewolf && wolfTeam.length >= villageTeam.length) {
-      return { winner: 'wolves', reason: 'So luong Soi ap dao Dan lang' };
+      return { winner: 'wolves', reason: 'Số lượng Sói áp đảo Dân làng' };
     }
     return null;
   }
@@ -642,18 +642,18 @@ class Game {
     switch (this.phase) {
       case PHASE.NIGHT_CUPID:
         if (player.role === 'cupid') {
-          return { action: 'cupid_choose', message: 'Chon 2 nguoi de ket thanh doi tinh nhan', targets: alive.map((p) => ({ id: p.id, name: p.name })) };
+          return { action: 'cupid_choose', message: 'Chọn 2 người để kết thành đôi tình nhân', targets: alive.map((p) => ({ id: p.id, name: p.name })) };
         }
-        return { action: null, message: 'Cupid dang chon cap doi...' };
+        return { action: null, message: 'Thần tình yêu đang chọn cặp đôi...' };
       case PHASE.NIGHT_GUARD:
         if (player.role === 'guard') {
           return {
             action: 'guard_protect',
-            message: 'Chon mot nguoi de bao ve dem nay',
+            message: 'Chọn một người để bảo vệ đêm nay',
             targets: others(false).filter((p) => p.id !== this.lastProtectedId).map((p) => ({ id: p.id, name: p.name })),
           };
         }
-        return { action: null, message: 'Bao ve dang lam nhiem vu...' };
+        return { action: null, message: 'Bảo vệ đang làm nhiệm vụ...' };
       case PHASE.NIGHT_WOLVES:
         if (isWolfTeam(player.role)) {
           const teammates = alive.filter((p) => isWolfTeam(p.role)).map((p) => ({ id: p.id, name: p.name, role: p.role }));
@@ -664,18 +664,18 @@ class Game {
             teammates,
           };
         }
-        return { action: null, message: 'Bay Soi dang san moi...' };
+        return { action: null, message: 'Bầy Sói đang săn mồi...' };
       case PHASE.NIGHT_WHITEWOLF:
         if (player.role === 'whitewolf') {
           const teammates = alive.filter((p) => isWolfTeam(p.role) && p.id !== player.id);
-          return { action: 'whitewolf_kill', message: 'Ban co the giet mot Soi dong bon (dung 1 lan duy nhat)', targets: teammates.map((p) => ({ id: p.id, name: p.name })) };
+          return { action: 'whitewolf_kill', message: 'Bạn có thể giết một Sói đồng bọn (dùng 1 lần duy nhất)', targets: teammates.map((p) => ({ id: p.id, name: p.name })) };
         }
         return { action: null, message: '...' };
       case PHASE.NIGHT_SEER:
         if (player.role === 'seer') {
-          return { action: 'seer_check', message: 'Chon mot nguoi de soi', targets: others(true).map((p) => ({ id: p.id, name: p.name })) };
+          return { action: 'seer_check', message: 'Chọn một người để soi', targets: others(true).map((p) => ({ id: p.id, name: p.name })) };
         }
-        return { action: null, message: 'Tien tri dang do xem van menh...' };
+        return { action: null, message: 'Tiên tri đang dò xem vận mệnh...' };
       case PHASE.NIGHT_WITCH:
         if (player.role === 'witch') {
           const victim = !player.hasUsedHeal && this.night.currentWolfVictim ? this.players.get(this.night.currentWolfVictim) : null;
@@ -690,19 +690,19 @@ class Game {
             targets: others(true).map((p) => ({ id: p.id, name: p.name })),
           };
         }
-        return { action: null, message: 'Phu thuy dang bao che thuoc...' };
+        return { action: null, message: 'Phù thủy đang bào chế thuốc...' };
       case PHASE.HUNTER_SHOT: {
         const hunterId = this.pendingHunterQueue[0];
         if (player.id === hunterId) {
-          return { action: 'hunter_shoot', message: 'Ban da chet! Chon mot nguoi de ban ha truoc khi ra di', targets: others(true).map((p) => ({ id: p.id, name: p.name })) };
+          return { action: 'hunter_shoot', message: 'Bạn đã chết! Chọn một người để bắn hạ trước khi ra đi', targets: others(true).map((p) => ({ id: p.id, name: p.name })) };
         }
-        return { action: null, message: 'Tho san dang tram ngam truoc khi ra di...' };
+        return { action: null, message: 'Thợ săn đang trầm ngâm trước khi ra đi...' };
       }
       case PHASE.DAY_VOTE:
         if (player.alive) {
-          return { action: 'day_vote', message: 'Bo phieu cho nguoi ban nghi la Soi', targets: others(true).map((p) => ({ id: p.id, name: p.name })) };
+          return { action: 'day_vote', message: 'Bỏ phiếu cho người bạn nghi là Sói', targets: others(true).map((p) => ({ id: p.id, name: p.name })) };
         }
-        return { action: null, message: 'Ban da mat, chi co the quan sat' };
+        return { action: null, message: 'Bạn đã mất, chỉ có thể quan sát' };
       default:
         return { action: null, message: null };
     }

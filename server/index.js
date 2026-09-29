@@ -74,7 +74,7 @@ io.on('connection', (socket) => {
     const game = new Game(roomCode);
     game.chat = new Chat();
     rooms.set(roomCode, game);
-    const player = game.addPlayer(socket.id, name || 'Chu phong');
+    const player = game.addPlayer(socket.id, name || 'Chủ phòng');
     player.sessionToken = randomUUID();
     socket.join(roomCode);
     socket.data.roomCode = roomCode;
@@ -87,7 +87,7 @@ io.on('connection', (socket) => {
     if (socket.data.roomCode) return cb && cb({ ok: false, error: 'Bạn đã ở trong một phòng.' });
     const code = (roomCode || '').toUpperCase().trim();
     const game = rooms.get(code);
-    if (!game) return cb && cb({ ok: false, error: 'Khong tim thay phong. Kiem tra lai ma phong.' });
+    if (!game) return cb && cb({ ok: false, error: 'Không tìm thấy phòng. Kiểm tra lại mã phòng.' });
 
     // Cho phep vao lai neu dang trong ban choi va bi rot mang truoc do
     let player = null;
@@ -97,11 +97,11 @@ io.on('connection', (socket) => {
         return cb && cb({ ok: false, error: 'Không thể vào lại: phiên người chơi không hợp lệ.' });
       }
       player = game.reconnectByName(socket.id, name);
-      if (!player) return cb && cb({ ok: false, error: 'Ban choi da bat dau, khong the tham gia moi.' });
+      if (!player) return cb && cb({ ok: false, error: 'Ván chơi đã bắt đầu, không thể tham gia mới.' });
     } else {
-      if (game.players.size >= 20) return cb && cb({ ok: false, error: 'Phong da day (toi da 20 nguoi).' });
+      if (game.players.size >= 20) return cb && cb({ ok: false, error: 'Phòng đã đầy (tối đa 20 người).' });
       const dup = [...game.players.values()].some((p) => p.name === (name || '').trim().slice(0, 20));
-      if (dup) return cb && cb({ ok: false, error: 'Ten nay da co nguoi dung, chon ten khac.' });
+      if (dup) return cb && cb({ ok: false, error: 'Tên này đã có người dùng, chọn tên khác.' });
       player = game.addPlayer(socket.id, name);
       player.sessionToken = randomUUID();
     }
@@ -121,9 +121,9 @@ io.on('connection', (socket) => {
 
   socket.on('start_game', ({ roleConfig, durations }, cb) => {
     const game = rooms.get(socket.data.roomCode);
-    if (!game) return cb && cb({ ok: false, error: 'Phong khong ton tai' });
+    if (!game) return cb && cb({ ok: false, error: 'Phòng không tồn tại' });
     const player = game.players.get(socket.data.playerId);
-    if (!player || !player.isHost) return cb && cb({ ok: false, error: 'Chi chu phong moi duoc bat dau game' });
+    if (!player || !player.isHost) return cb && cb({ ok: false, error: 'Chỉ chủ phòng mới được bắt đầu ván chơi' });
 
     const result = game.startGame(roleConfig, durations);
     if (!result.ok) return cb && cb({ ok: false, error: result.errors.join('; ') });
@@ -195,7 +195,7 @@ io.on('connection', (socket) => {
     const game = rooms.get(socket.data.roomCode);
     if (!game) return cb && cb({ ok: false });
     const player = game.players.get(socket.data.playerId);
-    if (!player || !player.isHost) return cb && cb({ ok: false, error: 'Chi chu phong moi duoc lam moi' });
+    if (!player || !player.isHost) return cb && cb({ ok: false, error: 'Chỉ chủ phòng mới được làm mới' });
     if (game.timer) clearTimeout(game.timer);
     for (const p of game.players.values()) {
       p.role = null;
@@ -236,5 +236,5 @@ function handleLeave(socket) {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Ma Soi Online server dang chay tai http://localhost:${server.address().port}`);
+  console.log(`Ma Sói Online server đang chạy tại http://localhost:${server.address().port}`);
 });

@@ -11,11 +11,41 @@ function setup(roles) {
     Object.assign(p, {role, biteCount:0, doomedNight:null});
   });
   // Keep phase transitions deterministic without real timers.
-  g._goToPhase = (_io, _fn, phase) => { g.phase = phase; };
+  g._goToPhase = (_io, _fn, phase) => { g.phase = phase; g.actionVersion++; };
   g.nightNumber = 1;
   return [g, [...g.players.values()]];
 }
 function bite(g, p) { g.night = g._emptyNightActions(); g.night.wolfVictims = [p.id]; g.night.currentWolfVictim = p.id; g._resolveNight(io, noop); }
+
+test('wolf timeout always selects a living non-wolf, including protected players', () => {
+  const [g,[wolf,guard,target]]=setup(['werewolf','guard','villager']);
+  guard.alive=false;g.phase=PHASE.NIGHT_WOLVES;g.night.guardTarget=target.id;
+  assert.ok(g.getPhasePrompt(wolf).targets.some(p=>p.id===target.id));
+  g._advanceFromTimer(io,noop);
+  assert.deepEqual(g.night.wolfVictims,[target.id]);
+  g._resolveNight(io,noop);assert.equal(target.alive,true);
+});
+test('wolf timeout honors submitted votes and revenge rounds choose distinct victims', () => {
+  const [g,[wolf,a,b,c]]=setup(['werewolf','villager','villager','villager']);
+  g.phase=PHASE.NIGHT_WOLVES;g.night.remainingBites=2;
+  g.night.wolfVotes[wolf.id]=a.id;
+  g._advanceFromTimer(io,noop);assert.equal(g.night.wolfVictims[0],a.id);
+  g._advanceFromTimer(io,noop);
+  assert.equal(new Set(g.night.wolfVictims).size,2);
+  assert.ok([b.id,c.id].includes(g.night.wolfVictims[1]));
+});
+test('wolf timeout with no eligible targets resolves without selecting a wolf', () => {
+  const [g]=setup(['werewolf','whitewolf']);g.phase=PHASE.NIGHT_WOLVES;
+  g._advanceFromTimer(io,noop);assert.deepEqual(g.night.wolfVictims,[null]);
+});
+test('saved bite victim counts toward living village and guard can skip', () => {
+  const [g,[guard,wolf,target]]=setup(['guard','werewolf','villager']);
+  g.phase=PHASE.NIGHT_GUARD;
+  g.recordAction(io,noop,guard.id,'guard_protect',{targetId:null});
+  assert.equal(g.phase,PHASE.NIGHT_WOLVES);
+  g.night.guardTarget=target.id;g.night.wolfVictims=[target.id];
+  g._resolveNight(io,noop);assert.equal(g._checkWinCondition(),null);
+});
 test('witch can heal then poison, with victim hidden after heal is consumed', () => {
   const [g,[witch,victim,target]]=setup(['witch','villager','werewolf']);
   g.phase=PHASE.NIGHT_WITCH;g.night.currentWolfVictim=victim.id;g.night.wolfVictims=[victim.id];

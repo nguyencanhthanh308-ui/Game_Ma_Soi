@@ -11,6 +11,11 @@ Thiết kế cho khoảng **12–15 người chơi**, cho phép bắt đầu t�
 - Mỗi kênh giữ tối đa 100 tin, mỗi tin tối đa 500 ký tự; lịch sử xóa khi bắt đầu/chơi lại. Khi mất mạng, cùng tab tự kết nối lại bằng mã phiên riêng và lấy lại lịch sử được phép đọc. Không chia sẻ dữ liệu phiên cho người khác.
 - **Voice chat (giọng nói) 🎙️**: bấm "Bật mic" để nói chuyện trực tiếp bằng WebRTC (kết nối trực tiếp giữa các trình duyệt, không qua server lưu trữ âm thanh). Tự động chia 3 kênh theo trạng thái game — 🏘️ Làng (ban ngày, ai còn sống), 🐺 Bầy Sói (riêng tư ban đêm), 👻 Âm phủ (người đã mất) — giống hệt logic chat chữ ở trên. Có chấm sáng báo hiệu ai đang nói.
 - **Giọng dẫn chuyện 🔊**: tự động đọc to các mốc quan trọng ("Bầy Sói hãy dậy", "Tiên tri hãy dậy"...) bằng giọng đọc có sẵn của trình duyệt, có thể tắt bằng nút riêng.
+- **Nghe không cần bật mic**: nếu trình duyệt chặn tự phát tiếng, bấm **Nghe trò chuyện**. Bật/tắt mic chỉ đổi nguồn âm thanh, giữ nguyên kết nối với mọi người. Khi tạm mất mạng ở sảnh, hệ thống giữ chỗ 30 giây để cùng phiên vào lại.
+- **Dẫn chuyện khi mở nhiều tab**: chỉ tab đang hiển thị và đã được bấm/chạm mới đọc; đổi lượt sẽ hủy lời dẫn cũ. Ưu tiên giọng tiếng Việt cài trên máy; nếu không có giọng tiếng Việt thì chỉ phát âm báo.
+- **Sói không bỏ lượt cắn**: hết giờ dùng các phiếu đã gửi; nếu chưa có phiếu, chọn ngẫu nhiên một người còn sống ngoài phe Sói. Người được Bảo vệ vẫn là mục tiêu hợp lệ; hiệu lực bảo vệ được xử lý khi tổng kết đêm. Hai lần cắn do Sói con phải chọn hai người khác nhau, nếu còn đủ mục tiêu.
+- **Đọc vai trước khi vào đêm**: chia bài xong, mỗi người bấm **Tôi đã đọc vai, sẵn sàng!**. Không chạy đồng hồ cho đến khi tất cả đã sẵn sàng và còn kết nối. Chủ phòng có thể hủy chia vai để về sảnh; người đã mất kết nối được bỏ khỏi sảnh khi hủy. Nếu chủ phòng mất mạng, sau 30 giây quyền chủ phòng chuyển cho một người còn kết nối.
+- **Xác nhận hành động**: giao diện chỉ báo đã nhận sau phản hồi từ server. Nếu bị từ chối hoặc chưa nhận được xác nhận, người chơi có thể thử lại; lựa chọn đang chọn được giữ khi người khác cập nhật. Gói của lượt cũ không được áp dụng vào lượt mới, kể cả hai bước Phù thủy hoặc hai lượt Sói cắn.
 - **Nhạc nền 🎵**: đã kèm hai đoạn nhạc tự tổng hợp, đổi theo ngày/đêm; mỗi người tự bật/tắt, mặc định tắt.
 - **Gửi voice trong chat**: bấm “Ghi voice”, cho phép micro, rồi “Dừng và gửi voice”; tự dừng sau 20 giây, có nút hủy. Người nhận bấm “Nghe voice”. Ghi âm cần HTTPS (hoặc localhost). Voice tuân thủ quyền chat chung / Sói / Âm phủ; mất kết nối hoặc đổi lượt/kênh sẽ hủy bản ghi đang thu. Voice lưu trong bộ nhớ cùng lịch sử chat và bị xóa khi chơi lại.
 - **Bộ vai trong sảnh**: mọi người thấy số lượng từng vai mà chủ phòng đang chọn, cập nhật khi chỉnh; không hiện ai sẽ nhận vai nào.
@@ -36,7 +41,11 @@ Game hỗ trợ **16 vai** theo bộ phổ biến mở rộng, với luật riê
 
 Sói trắng tham gia săn cùng bầy, có thêm một lần giết Sói khác và chỉ thắng khi sống sót cuối cùng. Phe Sói thường cần loại Sói trắng trước khi thắng theo số lượng. Sói con chết vì bất kỳ nguyên nhân nào sẽ kích hoạt **hai lượt chọn nạn nhân khác nhau** vào đêm tiếp theo. Phù thủy quyết định cứu trước rồi chọn dùng độc hoặc bỏ qua, có thể dùng cả hai trong một đêm; mỗi bình chỉ dùng một lần trong ván. Chỉ khi còn bình cứu mới thấy nạn nhân bị cắn trong đêm hiện tại; không hồi sinh người chết hôm trước. Thuốc cứu chỉ cứu nạn nhân lần cắn đầu tiên. Cặp tình nhân thắng riêng nếu là hai người sống cuối cùng.
 
+Kết quả từng lượt cắn được lưu đúng thứ tự, kể cả lượt không có mục tiêu hợp lệ; nạn nhân lượt hai không trở thành nạn nhân lượt đầu để dùng thuốc cứu.
+
 Chạy `npm test` để kiểm tra năng lực, chia bài riêng tư và chơi lại, bao gồm kết nối 16 người chơi tới server thật.
+
+Trên Windows có Microsoft Edge, chạy `node scripts/voice-check.cjs` để kiểm tra 9 tab với micro giả lập: nghe khi tắt mic, bật/tắt không tạo lại kết nối, tự vào lại sảnh và 9 mic truyền đồng thời. Có thể đặt `EDGE_PATH` nếu Edge nằm ở đường dẫn khác. Đây là kiểm tra trên máy local, không thay thế thử nghiệm qua mạng di động/NAT thực tế.
 
 | Vai trò | Phe | Mô tả ngắn |
 |---|---|---|
@@ -120,8 +129,9 @@ masoi-online/
 
 - **Voice chat dùng WebRTC mesh (kết nối trực tiếp p2p)**: hoạt động tốt với vài người trong 1 kênh (ví dụ 2-4 Sói, hoặc vài người ở Âm phủ). Với kênh Làng đông người (10+ người cùng lúc), mỗi trình duyệt phải mở nhiều kết nối cùng lúc nên có thể hơi nặng máy/mạng yếu — cân nhắc vẫn dùng thêm Discord/Zoom ngoài nếu phòng đông và mạng không ổn định.
 - **WebRTC cần STUN/TURN để xuyên NAT**: code đang dùng STUN công cộng miễn phí của Google, đủ dùng cho phần lớn mạng nhà/mạng di động thông thường. Nếu một số người không nghe được nhau (mạng công ty, mạng chặn UDP...), cần tự thêm TURN server riêng (ví dụ dịch vụ metered.ca) vào `RTC_CONFIG` trong `public/voice.js`.
-- **Giọng dẫn chuyện** phụ thuộc vào giọng đọc tiếng Việt có sẵn trên trình duyệt/thiết bị của từng người — chất lượng có thể khác nhau, một số máy có thể không có giọng tiếng Việt và sẽ đọc bằng giọng mặc định khác.
+- **Giọng dẫn chuyện** phụ thuộc vào giọng đọc tiếng Việt có sẵn trên trình duyệt/thiết bị của từng người. Máy không có giọng tiếng Việt chỉ phát âm báo; giọng online vẫn phụ thuộc kết nối mạng.
 - Nhạc cần thao tác bấm của người dùng để trình duyệt cho phép phát. Giọng dẫn chuyện tiếng Việt phụ thuộc giọng đọc có sẵn trên thiết bị.
 - Vai trò được lưu trong bộ nhớ server (không dùng database) — nếu server restart giữa ván, các phòng đang chơi sẽ mất. Phù hợp cho các buổi chơi ngắn vài giờ.
+- Phòng không còn ai kết nối được giữ tối đa 5 phút rồi dọn cùng bộ đếm giờ. Server kiểm tra định dạng gói Socket và giới hạn tần suất; tín hiệu voice có hạn mức riêng để phòng đông không chiếm lượt gửi hành động.
 - Chưa có xác thực người dùng — bất kỳ ai có link + mã phòng đều vào được, phù hợp chơi với bạn bè.
 - Vì trạng thái vai trò gửi qua socket riêng cho từng người, một người chơi cố tình mở DevTools vẫn có thể xem được dữ liệu gửi tới đúng socket của họ (nhưng không thấy được vai trò người khác trừ khi cùng phe Sói).

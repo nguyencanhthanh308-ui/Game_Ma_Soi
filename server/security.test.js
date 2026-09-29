@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { TokenBucket, RoomCleanup, HostRecovery } = require('./Security');
+const { TokenBucket, RoomCleanup, HostRecovery, validSocketData } = require('./Security');
 const { Game, PHASE } = require('./Game');
 const { validateRoleConfig } = require('./roles');
 
@@ -11,6 +11,21 @@ test('invalid role counts cannot invoke object coercion or throw', () => {
     }
   }
   assert.deepEqual(validateRoleConfig({werewolf:1,villager:2},3),[]);
+});
+
+test('socket schemas reject nested malformed actions, spoofed signaling and non-object packets', () => {
+  const events = ['create_room','join_room','start_game','set_role_config','player_action','voice_signal','chat_send'];
+  for (const event of events) for (const data of [null, false, 12, 'text', []]) assert.equal(validSocketData(event,data),false);
+  for (const payload of [{targetIds:{}},{targetIds:'ab'},{targetIds:['a',{}]},{targetIds:['a']}]) {
+    assert.equal(validSocketData('player_action',{type:'cupid_choose',payload,actionVersion:1}),false);
+  }
+  assert.equal(validSocketData('player_action',{type:'wolf_vote',payload:{targetId:'a'}}),false);
+  assert.equal(validSocketData('player_action',{type:'witch_action',payload:{heal:'yes'},actionVersion:1}),false);
+  const signal = {toPlayerId:'p',data:{type:'offer',channel:'wolves',toSocketId:'s',sdp:{type:'offer',sdp:'v=0'}}};
+  assert.equal(validSocketData('voice_signal',signal),true);
+  assert.equal(validSocketData('voice_signal',{...signal,data:{...signal.data,sdp:'fake'}}),false);
+  assert.equal(validSocketData('voice_signal',{...signal,data:{...signal.data,sdp:{type:'answer',sdp:'v=0'}}}),false);
+  assert.equal(validSocketData('voice_signal',{...signal,data:{...signal.data,type:'candidate',candidate:{candidate:{}}}}),false);
 });
 
 test('rate limit bounds bursts and recovers without accumulating unlimited credit', () => {
@@ -50,10 +65,11 @@ test('no-op, duplicate and out-of-phase actions do not broadcast', () => {
   g.recordAction(io,broadcast,a.id,'ready',{});
   assert.equal(broadcasts,0);
   g.phase = PHASE.ROLE_REVEAL;
-  g.recordAction(io,broadcast,a.id,'ready',{});
-  g.recordAction(io,broadcast,a.id,'ready',{});
+  assert.ok(g.recordAction(io,broadcast,a.id,'ready',{}).ok);
+  assert.ok(g.recordAction(io,broadcast,a.id,'ready',{}).ok);
   assert.equal(broadcasts,1);
   g.phase = PHASE.DAY_DISCUSSION;
+  g.actionVersion++;
   g.recordAction(io,broadcast,a.id,'skip_day',{dayNumber:0});
   g.recordAction(io,broadcast,a.id,'skip_day',{dayNumber:0});
   assert.equal(broadcasts,2);

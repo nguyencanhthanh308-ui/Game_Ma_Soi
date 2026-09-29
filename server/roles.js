@@ -23,7 +23,7 @@ const ROLE_INFO = {
     "name": "Sói thường",
     "team": "wolf",
     "icon": "🐺",
-    "desc": "Cùng bầy Sói chọn nạn nhân mỗi đêm. Hòa phiếu sẽ chọn ngẫu nhiên trong các mục tiêu nhiều phiếu nhất.",
+    "desc": "Cùng bầy Sói chọn nạn nhân mỗi đêm. Hòa phiếu chọn ngẫu nhiên trong các mục tiêu nhiều phiếu nhất. Hết giờ không có phiếu: tự chọn một mục tiêu hợp lệ.",
     "play": "Chọn một nạn nhân khi đến lượt Bầy Sói; ban ngày che giấu danh tính.",
     "win": "Bầy Sói đạt số lượng bằng hoặc lớn hơn những người còn lại, sau khi loại Sói trắng.",
     "maxCount": 20

@@ -27,7 +27,7 @@ class RoomCleanup {
   }
 
   update(game) {
-    if ([...game.players.values()].some(p => p.connected)) {
+    if (this.rooms.get(game.roomCode) !== game || [...game.players.values()].some(p => p.connected)) {
       const timer = this.pending.get(game);
       if (timer !== undefined) this.cancel(timer);
       this.pending.delete(game);
@@ -54,7 +54,7 @@ class HostRecovery {
 
   update(game) {
     const host = game.players.get(game.hostId);
-    if (!host || host.connected) {
+    if (this.rooms.get(game.roomCode) !== game || !host || host.connected) {
       const timer = this.pending.get(game);
       if (timer !== undefined) this.cancel(timer);
       this.pending.delete(game);
@@ -79,4 +79,58 @@ class HostRecovery {
   }
 }
 
-module.exports = { TokenBucket, RoomCleanup, HostRecovery };
+const { ROLE_INFO } = require('./roles');
+const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const string = (value, max = 100) => typeof value === 'string' && value.length > 0 && value.length <= max;
+const optionalTarget = value => value == null || string(value);
+const onlyKeys = (value, keys) => Object.keys(value).every(key => keys.includes(key));
+
+function validActionPayload(type, payload) {
+  if (!object(payload)) return false;
+  switch (type) {
+    case 'ready': return onlyKeys(payload, []);
+    case 'skip_day': return onlyKeys(payload, ['dayNumber']) && Number.isSafeInteger(payload.dayNumber) && payload.dayNumber >= 0;
+    case 'cupid_choose': return onlyKeys(payload, ['targetIds']) && Array.isArray(payload.targetIds) && payload.targetIds.length === 2 && payload.targetIds.every(id => string(id));
+    case 'witch_action': return onlyKeys(payload, ['heal', 'poisonTargetId']) && (payload.heal === undefined || typeof payload.heal === 'boolean') && optionalTarget(payload.poisonTargetId);
+    case 'guard_protect': case 'wolf_vote': case 'whitewolf_kill': case 'seer_check': case 'hunter_shoot': case 'day_vote':
+      return onlyKeys(payload, ['targetId']) && optionalTarget(payload.targetId);
+    default: return false;
+  }
+}
+
+function validRoleConfig(config) {
+  return object(config) && Object.entries(config).every(([id, count]) =>
+    Object.hasOwn(ROLE_INFO, id) && Number.isInteger(count) && count >= 0 && count <= ROLE_INFO[id].maxCount);
+}
+
+function validVoiceSignal(value) {
+  if (!object(value) || !string(value.toPlayerId) || !object(value.data)) return false;
+  const d = value.data;
+  if (!['village', 'wolves', 'dead'].includes(d.channel) || !string(d.toSocketId)) return false;
+  if (d.type === 'offer' || d.type === 'answer') {
+    return object(d.sdp) && d.sdp.type === d.type && string(d.sdp.sdp, 64000);
+  }
+  if (d.type !== 'candidate' || !object(d.candidate)) return false;
+  const c = d.candidate;
+  return typeof c.candidate === 'string' && c.candidate.length <= 2048 &&
+    (c.sdpMid == null || string(c.sdpMid, 128)) &&
+    (c.sdpMLineIndex == null || (Number.isInteger(c.sdpMLineIndex) && c.sdpMLineIndex >= 0 && c.sdpMLineIndex <= 32)) &&
+    (c.usernameFragment == null || string(c.usernameFragment, 128));
+}
+
+function validSocketData(event, data) {
+  switch (event) {
+    case 'create_room': return object(data) && string(data.name) && !!data.name.trim();
+    case 'join_room': return object(data) && string(data.name) && !!data.name.trim() && string(data.roomCode, 32) && (data.sessionToken === undefined || string(data.sessionToken));
+    case 'start_game': return object(data) && validRoleConfig(data.roleConfig) && (data.durations === undefined || object(data.durations));
+    case 'set_role_config': return validRoleConfig(data);
+    case 'player_action': return object(data) && Number.isSafeInteger(data.actionVersion) && data.actionVersion >= 0 && validActionPayload(data.type, data.payload);
+    case 'voice_signal': return validVoiceSignal(data);
+    case 'chat_audio': return Number.isSafeInteger(data) && data > 0;
+    case 'chat_send': return object(data); // Chat.send validates content, size and channel permissions.
+    case 'get_role_suggestion': case 'restart_to_lobby': case 'leave_room': return data == null;
+    default: return false;
+  }
+}
+
+module.exports = { TokenBucket, RoomCleanup, HostRecovery, validActionPayload, validSocketData };

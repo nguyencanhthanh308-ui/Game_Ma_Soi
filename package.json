@@ -4,7 +4,7 @@
   "description": "Web game Ma Soi (Werewolf) online - real-time voi Socket.io, danh cho 12-15 nguoi choi",
   "main": "server/index.js",
   "scripts": {
-    "test": "node --test server/",
+    "test": "node scripts/run-tests.cjs",
     "start": "node server/index.js",
     "dev": "nodemon server/index.js"
   },

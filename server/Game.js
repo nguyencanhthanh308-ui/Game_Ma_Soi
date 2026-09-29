@@ -8,9 +8,11 @@ const {
   validateRoleConfig,
   expandRoleConfig,
 } = require('./roles');
+const { validActionPayload } = require('./Security');
 
 const PHASE = {
   LOBBY: 'LOBBY',
+  ROLE_REVEAL: 'ROLE_REVEAL',
   NIGHT_CUPID: 'NIGHT_CUPID',
   NIGHT_GUARD: 'NIGHT_GUARD',
   NIGHT_WOLVES: 'NIGHT_WOLVES',
@@ -66,6 +68,8 @@ class Game {
     this.dayVotes = {};
     this.skipDayVotes = new Set();
     this.winner = null;
+    this.actionVersion = 0;
+    this.readyPlayers = new Set();
   }
 
   _emptyNightActions() {
@@ -165,6 +169,10 @@ class Game {
     if (errors.length) return { ok: false, errors };
 
     if (this.phase !== PHASE.LOBBY) return { ok: false, errors: ['Ván chơi đã bắt đầu'] };
+    if (durations !== undefined && (!durations || typeof durations !== 'object' || Array.isArray(durations) ||
+      Object.entries(durations).some(([phase, seconds]) => !Object.hasOwn(DEFAULT_DURATIONS, phase) || !Number.isInteger(seconds) || seconds < 1 || seconds > 600))) {
+      return { ok: false, errors: ['Thời gian mỗi lượt phải là số nguyên từ 1 đến 600 giây.'] };
+    }
     this.lastProtectedId = null;
     this.doubleKillNextNight = false;
     this.pendingHunterQueue = [];
@@ -172,6 +180,9 @@ class Game {
     this.lastDeaths = [];
     this.lastVoteResult = null;
     this.afterHunterResume = null;
+    this.readyPlayers.clear();
+    this.skipDayVotes.clear();
+    this.night = this._emptyNightActions();
     this.roleConfig = roleConfig;
     if (durations) this.durations = { ...this.durations, ...durations };
 
@@ -193,12 +204,25 @@ class Game {
       p.biteCount = 0;
       p.doomedNight = null;
       p.revealedPrince = false;
+      p.lastAction = null;
     });
 
     this.nightNumber = 0;
     this.dayNumber = 0;
     this.winner = null;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.phase = PHASE.ROLE_REVEAL;
+    this.phaseEndsAt = null;
+    this.actionVersion++;
     return { ok: true };
+  }
+
+  startWhenReady(io, broadcastFn) {
+    if (this.phase !== PHASE.ROLE_REVEAL || !this.players.size) return false;
+    if (![...this.players.values()].every(p => p.connected && this.readyPlayers.has(p.id))) return false;
+    this.enterNight(io, broadcastFn);
+    return true;
   }
 
   // ---------- May trang thai pha ----------
@@ -248,6 +272,7 @@ class Game {
     }
 
     this.phase = phase;
+    this.actionVersion++;
     const duration = this.durations[phase] || 15;
     this.phaseEndsAt = Date.now() + duration * 1000;
     broadcastFn(io);
@@ -285,15 +310,44 @@ class Game {
 
   // ---------- Ghi nhan hanh dong tu client ----------
 
-  recordAction(io, broadcastFn, playerId, type, payload) {
+  recordAction(io, broadcastFn, playerId, type, payload, actionVersion = this.actionVersion) {
+    const player = this.players.get(playerId);
+    if (!player?.connected || !validActionPayload(type, payload)) return { ok: false, error: 'Hành động không hợp lệ.' };
+    // A retry of an accepted request must never execute the action a second time.
+    const payloadKey = JSON.stringify(payload);
+    if (player.lastAction?.version === actionVersion && player.lastAction.type === type) {
+      return player.lastAction.payloadKey === payloadKey ? { ok: true, actionVersion }
+        : { ok: false, error: 'Bạn đã xác nhận lựa chọn khác trong lượt này.' };
+    }
+    if (actionVersion !== this.actionVersion) return { ok: false, error: 'Lượt đã thay đổi. Hãy chọn lại ở lượt hiện tại.' };
+    let changed = false;
+    const broadcast = () => { changed = true; broadcastFn(io); };
+    const previousAction = player.lastAction;
+    player.lastAction = { version: actionVersion, type, payloadKey };
+    const accepted = this._recordAction(io, broadcast, playerId, type, payload);
+    if (!accepted) {
+      player.lastAction = previousAction;
+      return { ok: false, error: 'Không thể thực hiện lựa chọn này. Hãy kiểm tra lượt và mục tiêu.' };
+    }
+    if (!changed) broadcastFn(io);
+    return { ok: true, actionVersion };
+  }
+
+  _recordAction(io, broadcastFn, playerId, type, payload) {
     const player = this.players.get(playerId);
     if (!player) return;
+    if (type === 'ready') {
+      if (this.phase !== PHASE.ROLE_REVEAL || this.readyPlayers.has(player.id)) return false;
+      this.readyPlayers.add(player.id);
+      this.startWhenReady(io, broadcastFn);
+      return true;
+    }
     if (this.phase === PHASE.HUNTER_SHOT && type === 'hunter_shoot') {
       if (player.id !== this.pendingHunterQueue[0]) return;
       if (!this.players.get(payload.targetId)?.alive) return;
       this._resolveHunterShot(payload.targetId);
       this._continueAfterHunter(io, broadcastFn);
-      return;
+      return true;
     }
     if (!player.alive) return;
     if (type === 'skip_day') {
@@ -303,10 +357,10 @@ class Game {
       if (this.alivePlayers().every(p => this.skipDayVotes.has(p.id))) {
         this.lastVoteResult = { eliminatedId: null, tally: {} };
         this._afterDayFlow(io, broadcastFn); // ham nay tu broadcast khi sang pha moi
-        return;
+        return true;
       }
       broadcastFn(); // cap nhat dem "x/y nguoi dong y" cho moi nguoi
-      return;
+      return true;
     }
     const prompt = this.getPhasePrompt(player);
     if (prompt.action !== type) return;
@@ -317,21 +371,22 @@ class Game {
 
     if (this.phase === PHASE.NIGHT_CUPID && type === 'cupid_choose' && player.role === 'cupid') {
       const [a, b] = payload.targetIds || [];
-      if (a && b && a !== b && this.players.has(a) && this.players.has(b)) {
+      if (a && b && a !== b && validTarget(a) && validTarget(b)) {
         this.players.get(a).loverId = b;
         this.players.get(b).loverId = a;
         this.night.cupidPairChosen = true;
         this._goToPhase(io, broadcastFn, PHASE.NIGHT_GUARD);
+        return true;
       }
       return;
     }
 
     if (this.phase === PHASE.NIGHT_GUARD && type === 'guard_protect' && player.role === 'guard') {
       const target = payload.targetId;
-      if (target === this.lastProtectedId) return; // khong duoc trung nguoi cu
+      if (target && target === this.lastProtectedId) return; // khong duoc trung nguoi cu
       this.night.guardTarget = target || null;
       this._goToPhase(io, broadcastFn, PHASE.NIGHT_WOLVES);
-      return;
+      return true;
     }
 
     if (this.phase === PHASE.NIGHT_WOLVES && type === 'wolf_vote' && isWolfTeam(player.role)) {
@@ -342,7 +397,7 @@ class Game {
       if (allVoted) {
         this._finishWolfRound(io, broadcastFn);
       }
-      return;
+      return true;
     }
 
     if (this.phase === PHASE.NIGHT_WHITEWOLF && type === 'whitewolf_kill' && player.role === 'whitewolf') {
@@ -353,7 +408,7 @@ class Game {
         this.night.whiteWolfTarget = 'skip';
       }
       this._goToPhase(io, broadcastFn, PHASE.NIGHT_SEER);
-      return;
+      return true;
     }
 
     if (this.phase === PHASE.NIGHT_SEER && type === 'seer_check' && player.role === 'seer') {
@@ -370,12 +425,13 @@ class Game {
         io.to(player.socketId).emit('seer_result', result);
       }
       this._goToPhase(io, broadcastFn, PHASE.NIGHT_WITCH);
-      return;
+      return true;
     }
 
     if (this.phase === PHASE.NIGHT_WITCH && type === 'witch_action' && player.role === 'witch') {
       if (prompt.step === 'heal') {
         if (typeof payload.heal !== 'boolean' || payload.poisonTargetId) return;
+        if (payload.heal && !prompt.canHeal) return;
         this.night.witchHealDecided = true;
         if (payload.heal && prompt.canHeal) {
           this.night.witchHeal = true;
@@ -384,11 +440,12 @@ class Game {
         if (!player.hasUsedPoison) {
           // Con binh doc: phat lai state de phu thuy nhan prompt buoc 'poison'.
           // Thieu dong nay thi phu thuy dung yen o buoc 'heal' cho den khi het gio.
+          this.actionVersion++;
           broadcastFn();
-          return;
+          return true;
         }
         this._resolveNight(io, broadcastFn);
-        return;
+        return true;
       }
       if (payload.heal !== undefined) return;
       if (payload.poisonTargetId && !player.hasUsedPoison) {
@@ -396,7 +453,7 @@ class Game {
         player.hasUsedPoison = true;
       }
       this._resolveNight(io, broadcastFn);
-      return;
+      return true;
     }
 
     if (this.phase === PHASE.DAY_VOTE && type === 'day_vote') {
@@ -404,14 +461,15 @@ class Game {
       const alive = this.alivePlayers();
       const allVoted = alive.every((p) => this.dayVotes[p.id] !== undefined);
       if (allVoted) this._resolveDayVote(io, broadcastFn);
-      return;
+      return true;
     }
   }
 
   _finishWolfRound(io, broadcastFn) {
     this._tallyWolfVotes();
     const victim = this.night.currentWolfVictim;
-    if (victim) this.night.wolfVictims.push(victim);
+    // Preserve the slot even when a round has no eligible victim.
+    this.night.wolfVictims[this.night.wolfRound - 1] = victim || null;
     this.night.remainingBites -= 1;
     if (this.night.remainingBites > 0) {
       this.night.wolfVotes = {};
@@ -429,6 +487,10 @@ class Game {
       tally[targetId] = (tally[targetId] || 0) + 1;
     }
     this.night.currentWolfVictim = this._pickTopVoted(tally);
+    if(!this.night.currentWolfVictim && this.aliveWolves().length){
+      const targets=this.alivePlayers().filter(p=>!isWolfTeam(p.role)&&!this.night.wolfVictims.includes(p.id));
+      if(targets.length)this.night.currentWolfVictim=targets[Math.floor(Math.random()*targets.length)].id;
+    }
   }
 
   _pickTopVoted(tally) {
@@ -599,7 +661,7 @@ class Game {
     }
 
     const wolfTeam = alive.filter((p) => isWolfTeam(p.role));
-    const villageTeam = alive.filter((p) => !isWolfTeam(p.role) && !this.night.wolfVictims.includes(p.id));
+    const villageTeam = alive.filter((p) => !isWolfTeam(p.role));
 
     if (wolfTeam.length === 0) {
       return { winner: 'village', reason: 'Tất cả Sói đã bị tiêu diệt' };
@@ -613,6 +675,7 @@ class Game {
   _endGame(io, broadcastFn, result) {
     if (this.timer) clearTimeout(this.timer);
     this.phase = PHASE.GAME_OVER;
+    this.actionVersion++;
     this.winner = result;
     this.phaseEndsAt = null;
     broadcastFn(io);
@@ -714,6 +777,8 @@ class Game {
       phase: this.phase,
       phaseEndsAt: this.phaseEndsAt,
       actionRound: this.night.wolfRound,
+      actionVersion: this.actionVersion,
+      readyPlayers: this.phase === PHASE.ROLE_REVEAL ? [...this.readyPlayers] : [],
       nightNumber: this.nightNumber,
       dayNumber: this.dayNumber,
       skipDayVotes: this.phase === PHASE.DAY_DISCUSSION ? [...this.skipDayVotes] : [],

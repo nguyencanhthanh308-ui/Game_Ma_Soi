@@ -51,6 +51,8 @@ test('voice channel assignment and signal relay isolation work end-to-end over r
   const roleConfig = { villager: 6, werewolf: 2, wolfcub: 0, whitewolf: 0, seer: 0, guard: 0, witch: 0, hunter: 0, cupid: 0, lycan: 0, cursed: 0, elder: 0, toughguy: 0, prince: 0, tanner: 0, mason: 0 };
   const started = await host.emit('start_game', { roleConfig, durations: { NIGHT_CUPID: 1, NIGHT_GUARD: 1, NIGHT_WOLVES: 60, NIGHT_WHITEWOLF: 1, NIGHT_SEER: 1, NIGHT_WITCH: 1 } });
   assert.ok(started.ok, JSON.stringify(started));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  for(const c of allClients)assert.ok((await c.emit('player_action',{type:'ready',payload:{},actionVersion:latestPrivate(c).actionVersion})).ok);
 
   // Cho troi qua Cupid(1s)+Guard(1s) de vao dung pha NIGHT_WOLVES
   await new Promise(resolve => setTimeout(resolve, 1300));
@@ -69,17 +71,18 @@ test('voice channel assignment and signal relay isolation work end-to-end over r
   const wolfBRoster = latestPrivate(wolfB).voicePeers;
   assert.deepEqual(wolfBRoster.map(p => p.playerId).sort(), [wolfA.playerId].sort(), 'wolfB phai thay dung wolfA trong roster');
 
-  await wolfA.emitNoAck('voice_signal', { toPlayerId: wolfB.playerId, data: { type: 'candidate', candidate: { fake: true } } });
+  const signal={type:'candidate',channel:'wolves',toSocketId:latestPrivate(wolfA).voicePeers[0].socketId,candidate:{candidate:'candidate:test',sdpMid:'0',sdpMLineIndex:0}};
+  await wolfA.emitNoAck('voice_signal', { toPlayerId: wolfB.playerId, data: signal });
   await new Promise(resolve => setTimeout(resolve, 200));
   const received = voiceSignalsReceived(wolfB);
   assert.equal(received.length, 1, 'wolfB phai nhan duoc dung 1 tin hieu tu wolfA');
   assert.equal(received[0][1].fromPlayerId, wolfA.playerId);
-  assert.deepEqual(received[0][1].data, { type: 'candidate', candidate: { fake: true } });
+  assert.deepEqual(received[0][1].data, signal);
 
   // --- Dan lang co gang gui tin hieu den mot Soi that (khac kenh voice) -> server PHAI TU CHOI khong relay ---
   const villagerX = villagers[0];
   const beforeCount = voiceSignalsReceived(wolfA).length;
-  await villagerX.emitNoAck('voice_signal', { toPlayerId: wolfA.playerId, data: { type: 'offer', sdp: 'fake-should-be-blocked' } });
+  await villagerX.emitNoAck('voice_signal', { toPlayerId: wolfA.playerId, data: { type: 'offer', channel:'wolves', toSocketId:wolfBRoster[0].socketId, sdp: {type:'offer',sdp:'fake-should-be-blocked'} } });
   await new Promise(resolve => setTimeout(resolve, 200));
   const afterCount = voiceSignalsReceived(wolfA).length;
   assert.equal(afterCount, beforeCount, 'Tin hieu tu nguoi khac kenh voice (Dan lang -> Soi luc dem) khong duoc relay');

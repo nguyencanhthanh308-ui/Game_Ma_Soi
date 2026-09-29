@@ -64,7 +64,7 @@
   }
   function vietnameseVoice() {
     const vi = voices.filter((v) => /^vi\b|^vi[-_]/i.test(v.lang));
-    return vi.find((v) => /natural|online/i.test(v.name)) || vi[0] || null;
+    return vi.find((v) => v.localService) || vi[0] || null;
   }
   // Edge tra ve giong cuc bo (tieng Anh) truoc, giong online tieng Viet toi sau qua voiceschanged.
   // Vi vay phai cho toi khi thay giong tieng Viet (toi da 3 giay), khong chi cho danh sach khac rong.
@@ -92,15 +92,20 @@
 
   // ---------- Hang doi cau doc ----------
   // Moi lan chi dua MOT cau cho trinh duyet, thay vi xep ca loat vao speechSynthesis:
-  //  - sang pha moi thi bo cac cau cu chua doc, con cau dang doc thi duoc doc het, khong bi cat ngang;
+  //  - sang pha moi thi huy loi dan cu, tranh doc nham vai khi luot da chuyen;
   //  - go ket duoc khi trinh duyet khong bao 'end' cho mot cau.
   let queue = [];
   let current = null; // cau dang doc; giu tham chieu vi Chrome hay thu gom rac utterance giua chung
   let drained = null; // goi khi hang doi het, de nha khoa dan chuyen cho tab khac
   let watchdog = null;
+  let nextTimer=null;
+  let generation=0;
+  let unlocked=false;
+  let pendingNarration=null;
 
   function finishQueue() {
     clearTimeout(watchdog);
+    clearTimeout(nextTimer);
     current = null;
     queue = [];
     const done = drained;
@@ -120,25 +125,30 @@
       if (ended || current !== utter) return;
       ended = true;
       // Goi speak() ngay trong nhip vua ket thuc/cancel thi Chrome hay nuot mat cau moi
-      setTimeout(speakNext, 60);
+      clearTimeout(watchdog);
+      nextTimer=setTimeout(speakNext, 60);
     };
     utter.onend = next;
     utter.onerror = next;
     current = utter;
+    utter.onstart=()=>{if(current===utter&&item.key)saveSetting('masoi_narrated',item.key);};
+    synth.resume();
     synth.speak(utter);
     // Khoang 12 ky tu/giay, cong them thoi gian tai giong online. Qua han thi coi nhu ket va bo qua.
-    watchdog = setTimeout(() => { synth.cancel(); next(); }, 5000 + item.text.length * 120);
+    watchdog = setTimeout(() => { if(current===utter){synth.cancel();next();} }, 5000 + item.text.length * 120);
   }
-  function playLines(lines, voice, delayMs) {
+  function playLines(lines, voice, delayMs, key) {
     return new Promise((resolve) => {
       drained = resolve;
-      queue = lines.map((text) => ({ text, voice }));
-      setTimeout(() => { if (!current) speakNext(); }, Math.max(80, delayMs));
+      queue = lines.map((text) => ({ text, voice, key }));
+      nextTimer=setTimeout(() => { if (!current) speakNext(); }, Math.max(80, delayMs));
     });
   }
   function stopSpeaking() {
+    generation++;
+    const owned=!!current;
     finishQueue();
-    synth?.cancel();
+    if(owned)synth?.cancel();
   }
 
   // ---------- Chi mot tab doc moi lan ----------
@@ -149,19 +159,22 @@
   function narrateExclusive(key, cueName, lines) {
     lines = lines.filter(Boolean);
     if (!settings.narratorOn || (!lines.length && !cueName)) return;
+    pendingNarration={key,cueName,lines};
+    if(document.hidden||!unlocked)return;
+    stopSpeaking();
+    const token=generation;
     latestKey = key;
-    queue = []; // cau cu chua doc cua tab nay khong con dung nua; cau dang doc van doc het
+    queue = []; // Chi giu loi dan cua luot hien tai.
     const run = async () => {
-      if (key !== latestKey) return; // tab nay da sang pha moi hon trong luc cho khoa
+      if (token!==generation || document.hidden || key !== latestKey) return;
       if (key && readSetting('masoi_narrated') === key) return; // tab khac da doc lan doi pha nay
-      if (key) saveSetting('masoi_narrated', key);
       const wait = cue(cueName);
       if (!lines.length) return sleep(wait);
       const voice = await waitForVietnameseVoice();
-      if (!settings.narratorOn || key !== latestKey) return;
+      if (!settings.narratorOn || document.hidden || token!==generation || key !== latestKey) return;
       // Khong co giong tieng Viet thi giong tieng Anh se doc sai het, nen chi giu am bao.
       if (!voice) { warnNoVoice(); return sleep(wait); }
-      await playLines(lines, voice, wait);
+      await playLines(lines, voice, wait, key);
     };
     if (navigator.locks?.request) navigator.locks.request('masoi-narrator', run).catch(() => {});
     else run();
@@ -254,6 +267,9 @@
       const title = (w && labels[w.winner]?.title) || '';
       cueName = 'over';
       lines = ['Ván chơi đã kết thúc.', title, w?.reason];
+    } else if (phase === 'ROLE_REVEAL') {
+      cueName = 'start';
+      lines = [LINE_START, 'Đọc xong vai trò, hãy bấm sẵn sàng.'];
     } else if (prevPhase === 'LOBBY') {
       cueName = 'start';
       lines = [LINE_START, isNight ? LINE_NIGHTFALL : '', NARRATION[phase]];
@@ -273,10 +289,11 @@
     if (!cueName) return;
     // Moi tab nhan cung game_state; phaseEndsAt do server dat nen giong nhau o moi tab va khac nhau
     // giua cac lan vao pha, ke ca khi choi lai van moi trong cung phong.
-    narrateExclusive(`${gs?.roomCode}:${phase}:${gs?.phaseEndsAt}`, cueName, lines);
+    narrateExclusive(`${gs?.roomCode}:${phase}:${gs?.phaseEndsAt}:${gs?.actionRound}:${gs?.actionVersion}`, cueName, lines);
   }
 
   narratorBtn.addEventListener('click', () => {
+    unlocked=true;
     settings.narratorOn = !settings.narratorOn;
     saveSetting('masoi_narrator', settings.narratorOn ? 'on' : 'off');
     updateButtons();
@@ -298,15 +315,23 @@
   // Trinh duyet chi cho phat am thanh sau mot thao tac cua nguoi dung: tan dung moi lan
   // cham/bam phim de mo khoa Web Audio va giong doc, de cac lan doi pha sau phat duoc.
   function unlock() {
+    const first=!unlocked;
+    unlocked=true;
     if (settings.narratorOn) audioContext();
     if (settings.musicOn && state.lastGameState) playMusicFor(state.lastGameState.phase);
+    if(first&&pendingNarration){const p=pendingNarration;narrateExclusive(p.key,p.cueName,p.lines);}
   }
   document.addEventListener('pointerdown', unlock);
   document.addEventListener('keydown', unlock);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden)stopSpeaking();
+    else if(pendingNarration){const p=pendingNarration;narrateExclusive(p.key,p.cueName,p.lines);}
+  });
 
   // Goi tu app.js moi khi pha game thay doi
   window.gameAudio = {
     onPhaseChange(phase, prevPhase, gs) {
+      pendingNarration=null;stopSpeaking();
       narrate(phase, prevPhase, gs);
       playMusicFor(phase);
     },

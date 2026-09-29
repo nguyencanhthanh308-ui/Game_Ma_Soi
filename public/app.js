@@ -5,6 +5,7 @@ const socket = io();
 
 const PHASE_LABEL = {
   LOBBY: 'Sảnh chờ',
+  ROLE_REVEAL: 'Đọc vai và sẵn sàng',
   NIGHT_CUPID: '🌙 Đêm - Cupid',
   NIGHT_GUARD: '🌙 Đêm - Bảo vệ',
   NIGHT_WOLVES: '🌙 Đêm - Bầy Sói',
@@ -40,6 +41,8 @@ const state = {
   lastPrivate: null,
   selected: [],
   submittedForPhase: null,
+  pendingAction: null,
+  selectionKey: null,
   hasSeenReveal: false,
   timerInterval: null,
 };
@@ -106,6 +109,10 @@ function onJoinedRoom(roomCode, playerId, name, isHostGuess, sessionToken) {
   state.roleConfigCustomized = false;
   state.lastPrivate = null;
   state.hasSeenReveal = false;
+  state.pendingAction = null;
+  state.submittedForPhase = null;
+  state.selected = [];
+  state.selectionKey = null;
   state.roomCode = roomCode;
   state.playerId = playerId;
   state.myName = name;
@@ -291,10 +298,32 @@ function showReveal(privateState) {
   if (privateState.allies?.length) extra.textContent += ' Hội Tam điểm: ' + privateState.allies.join(', ');
   if (privateState.loverName) extra.textContent += ' Người yêu: ' + privateState.loverName + '. Hai bạn thắng riêng nếu là hai người cuối cùng.';
   showScreen('screen-reveal');
+  renderReadyStatus();
+}
+
+function renderReadyStatus() {
+  const gs = state.lastGameState;
+  const waiting = gs?.phase === 'ROLE_REVEAL';
+  const ready = gs?.readyPlayers || [];
+  const confirmed = ready.includes(state.playerId);
+  $('btn-continue').disabled = waiting && (confirmed || !!state.pendingAction);
+  $('btn-continue').textContent = waiting
+    ? (confirmed ? 'Bạn đã sẵn sàng' : state.pendingAction ? 'Đang gửi xác nhận…' : 'Tôi đã đọc vai, sẵn sàng!')
+    : 'Vào ván chơi';
+  const remaining = waiting ? gs.players.filter(p => !ready.includes(p.id) || !p.connected) : [];
+  $('ready-status').textContent = waiting
+    ? `${ready.length}/${gs.players.length} người đã đọc vai. Chờ tất cả sẵn sàng và kết nối.${remaining.length ? ' Còn chờ: ' + remaining.map(p => p.name + (!p.connected ? ' (mất kết nối)' : '')).join(', ') + '.' : ''}` : '';
+  $('btn-cancel-ready').classList.toggle('hidden', !waiting || !state.isHost);
 }
 
 $('btn-continue').addEventListener('click', () => {
+  if (state.lastGameState?.phase === 'ROLE_REVEAL') return send('ready', {});
   showScreen('screen-game');
+});
+$('btn-cancel-ready').addEventListener('click', () => {
+  socket.timeout(5000).emit('restart_to_lobby', null, (err, result) => {
+    if (err || !result?.ok) toast(result?.error || 'Chưa nhận được xác nhận từ server. Hãy thử lại.');
+  });
 });
 
 // ---------- Man hinh trong game ----------
@@ -342,7 +371,14 @@ function renderDeathsBanner(gs) {
 function renderActionArea(gs, priv) {
   const area = $('action-area');
   area.innerHTML = '';
+  if (!priv || priv.actionVersion !== gs.actionVersion) return;
   const prompt = priv.prompt;
+  const selectionKey = `${gs.actionVersion}:${prompt?.action}:${prompt?.step}`;
+  if (state.selectionKey !== selectionKey) {
+    state.selected = [];
+    state.selectionKey = selectionKey;
+  }
+  state.selected = state.selected.filter(id => prompt?.targets?.some(p => p.id === id));
   let messageText = prompt && prompt.message ? prompt.message : '';
 
   if (gs.phase === 'DAY_ANNOUNCE' || gs.phase === 'DAY_DISCUSSION') {
@@ -363,9 +399,9 @@ function renderActionArea(gs, priv) {
       const skip = document.createElement('button');
       skip.className = 'btn-secondary';
       skip.textContent = votes.includes(state.playerId) ? 'Bạn đã đồng ý bỏ qua ngày' : 'Bỏ qua ngày → Đêm tiếp theo';
-      skip.disabled = votes.includes(state.playerId);
+      skip.disabled = votes.includes(state.playerId) || !!state.pendingAction;
       skip.addEventListener('click', () => {
-        socket.emit('player_action', { type: 'skip_day', payload: { dayNumber: gs.dayNumber } });
+        send('skip_day', { dayNumber: gs.dayNumber });
       });
       area.appendChild(skip);
     }
@@ -373,15 +409,15 @@ function renderActionArea(gs, priv) {
 
   if (!prompt || !prompt.action) return;
 
-  if (state.submittedForPhase === gs.phase) {
+  if (state.submittedForPhase === gs.actionVersion || state.pendingAction?.version === gs.actionVersion) {
     const p = document.createElement('p');
     p.className = 'hint-text';
-    p.textContent = 'Đã gửi lựa chọn của bạn, đang chờ những người khác...';
+    p.textContent = state.submittedForPhase === gs.actionVersion
+      ? 'Server đã nhận lựa chọn của bạn, đang chờ những người khác...'
+      : 'Đang gửi, chờ server xác nhận…';
     area.appendChild(p);
     return;
   }
-
-  state.selected = [];
 
   const maxSelect = prompt.action === 'cupid_choose' ? 2 : 1;
   const targets = prompt.targets || [];
@@ -390,6 +426,7 @@ function renderActionArea(gs, priv) {
   targets.forEach((t) => {
     const btn = document.createElement('button');
     btn.className = 'target-btn';
+    btn.classList.toggle('selected', state.selected.includes(t.id));
     btn.textContent = t.name;
     btn.addEventListener('click', () => {
       if (state.selected.includes(t.id)) {
@@ -478,9 +515,25 @@ function renderActionArea(gs, priv) {
 }
 
 function send(type, payload) {
-  state.submittedForPhase = state.lastGameState.phase;
-  socket.emit('player_action', { type, payload });
-  renderActionArea(state.lastGameState, state.lastPrivate);
+  if (!socket.connected) return toast('Đang mất kết nối. Hãy chờ kết nối lại rồi gửi.');
+  if (state.pendingAction) return;
+  const version = state.lastGameState?.actionVersion;
+  if (version == null || state.lastPrivate?.actionVersion !== version) return toast('Đang cập nhật lượt. Hãy thử lại.');
+  const request = { version };
+  state.pendingAction = request;
+  const render = () => {
+    renderReadyStatus();
+    if (state.lastGameState) renderActionArea(state.lastGameState, state.lastPrivate);
+  };
+  render();
+  socket.timeout(5000).emit('player_action', { type, payload, actionVersion: version }, (err, result) => {
+    if (state.pendingAction !== request) return;
+    state.pendingAction = null;
+    if (state.lastGameState?.actionVersion !== version) return;
+    if (!err && result?.ok) state.submittedForPhase = version;
+    else if (state.submittedForPhase !== version) toast(result?.error || 'Chưa nhận được xác nhận. Bạn có thể gửi lại lựa chọn.');
+    render();
+  });
 }
 
 // ---------- Man hinh ket thuc ----------
@@ -515,9 +568,17 @@ function renderGameOver(gs) {
 // ---------- Socket events ----------
 
 socket.on('game_state', (gs) => {
+  const previousVersion = state.lastGameState?.actionVersion;
   const previousRound = state.lastGameState?.actionRound;
   const prevPhase = state.lastGameState ? state.lastGameState.phase : null;
   state.lastGameState = gs;
+  state.isHost = gs.hostId === state.playerId;
+  if (previousVersion !== gs.actionVersion) {
+    state.pendingAction = null;
+    state.submittedForPhase = null;
+    state.selected = [];
+    state.selectionKey = null;
+  }
   window.villageArt?.update(gs);
 
   // Ban ngay nen sang, ban dem nen toi + doc dan chuyen khi vua chuyen sang mot pha moi
@@ -527,7 +588,7 @@ socket.on('game_state', (gs) => {
   const inGame = gs.phase !== 'LOBBY' && gs.phase !== 'GAME_OVER';
   document.documentElement?.classList?.toggle('theme-day', inGame && isDay);
   document.documentElement?.classList?.toggle('theme-night', inGame && !isDay);
-  if (prevPhase !== gs.phase) window.gameAudio?.onPhaseChange(gs.phase, prevPhase, gs);
+  if (prevPhase !== gs.phase || previousRound !== gs.actionRound) window.gameAudio?.onPhaseChange(gs.phase, prevPhase, gs);
 
   if (gs.phase === 'LOBBY') {
     state.lastPrivate = null;
@@ -542,6 +603,13 @@ socket.on('game_state', (gs) => {
     renderGameOver(gs);
     return;
   }
+
+  if (gs.phase === 'ROLE_REVEAL') {
+    if (state.lastPrivate?.role && state.lastPrivate.actionVersion === gs.actionVersion) showReveal(state.lastPrivate);
+    renderReadyStatus();
+    return;
+  }
+  if (prevPhase === 'ROLE_REVEAL') showScreen('screen-game');
 
   if (prevPhase !== gs.phase || previousRound !== gs.actionRound) state.submittedForPhase = null;
 
@@ -562,11 +630,17 @@ socket.on('game_state', (gs) => {
 });
 
 socket.on('private_state', (priv) => {
-  if (state.lastPrivate?.prompt?.step !== priv.prompt?.step) state.submittedForPhase = null;
+  if (priv.actionVersion !== state.lastGameState?.actionVersion) return;
+  if (priv.submitted) state.submittedForPhase = priv.actionVersion;
   window.gameVoice?.syncVoiceChannel(priv);
   renderSeerResults(priv.seerResults || []);
   if (state.lastPrivate?.role && priv.role && state.lastPrivate.role.id !== priv.role.id) state.hasSeenReveal = false;
   state.lastPrivate = priv;
+  if (state.lastGameState?.phase === 'ROLE_REVEAL' && priv.role) {
+    state.hasSeenReveal = true;
+    showReveal(priv);
+    return;
+  }
   if (priv.role && !state.hasSeenReveal && state.lastGameState && state.lastGameState.phase !== 'LOBBY' && state.lastGameState.phase !== 'GAME_OVER') {
     state.hasSeenReveal = true;
     showReveal(priv);

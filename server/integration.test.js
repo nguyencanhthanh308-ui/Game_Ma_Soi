@@ -42,6 +42,12 @@ test('real server deals all 16 roles privately, sends descriptions and restarts'
   assert.deepEqual(clients[1].events.filter(e=>e[0]==='role_config').at(-1)[1],roleConfig);
   assert.ok((await host.emit('start_game',{roleConfig,durations:{NIGHT_CUPID:60}})).ok);
   await new Promise(resolve=>setTimeout(resolve,100));
+  for (const c of clients) {
+    const gs=c.events.filter(e=>e[0]==='game_state').at(-1)[1];
+    assert.equal(gs.phase,'ROLE_REVEAL');assert.equal(gs.phaseEndsAt,null);
+    assert.ok((await c.emit('player_action',{type:'ready',payload:{},actionVersion:gs.actionVersion})).ok);
+  }
+  await new Promise(resolve=>setTimeout(resolve,50));
   const assigned=[];
   for(const c of clients){
     const priv=c.events.filter(e=>e[0]==='private_state'&&e[1].role).at(-1)[1];
@@ -91,4 +97,45 @@ test('real server deals all 16 roles privately, sends descriptions and restarts'
   await new Promise(resolve=>setTimeout(resolve,100));
   assert.ok(clients.filter(c=>c.ws.readyState===WebSocket.OPEN && c.events.some(e=>e[0]==='private_state')).every(c=>c.events.filter(e=>e[0]==='private_state').at(-1)[1].role===null));
   assert.equal(host.events.filter(e=>e[0]==='chat_state').at(-1)[1].messages.length,0);
+
+  // A reconnect can arrive before the server has detected the old connection's loss.
+  const oldHost=host;
+  host=await connect();
+  const restored=await host.emit('join_room',{roomCode:room.roomCode,name:'Host',sessionToken:room.sessionToken});
+  assert.ok(restored.ok);
+  assert.equal(restored.playerId,room.playerId);
+  await new Promise(resolve=>setTimeout(resolve,50));
+  assert.notEqual(oldHost.ws.readyState,WebSocket.OPEN);
+  assert.equal(host.events.filter(e=>e[0]==='game_state').at(-1)[1].players.length,16);
+
+  // Network loss in the lobby must preserve the seat and host identity.
+  await new Promise(resolve=>{host.ws.once('close',resolve);host.ws.close();});
+  host=await connect();
+  assert.equal((await host.emit('join_room',{roomCode:room.roomCode,name:'Host',sessionToken:room.sessionToken})).playerId,room.playerId);
+  for(const event of ['create_room','join_room','start_game','player_action','voice_signal']){
+    assert.equal((await host.emit(event,null)).ok,false,event+' rejects malformed payload');
+  }
+  assert.equal((await host.emit('join_room',{roomCode:[],name:'Bad'})).ok,false);
+  assert.ok((await host.emit('get_role_suggestion',null)).ok,'server still responds after invalid packets');
+  for (const payload of [{targetIds:{}},{targetIds:['a',{}]},{targetIds:'ab'}]) {
+    const version=host.events.filter(e=>e[0]==='game_state').at(-1)[1].actionVersion;
+    assert.equal((await host.emit('player_action',{type:'cupid_choose',payload,actionVersion:version})).ok,false);
+  }
+  assert.equal((await host.emit('start_game',{roleConfig,durations:{NIGHT_WOLVES:{toString:null}}})).ok,false);
+  const spammer=await connect();
+  const burst=await Promise.all(Array.from({length:100},()=>spammer.emit('get_role_suggestion',null)));
+  assert.ok(burst.some(r=>r.error?.includes('quá nhanh')));
+  assert.ok((await host.emit('get_role_suggestion',null)).ok,'rate limiting another socket does not eject the room');
+  assert.ok((await host.emit('start_game',{roleConfig})).ok);
+  await new Promise(resolve=>setTimeout(resolve,50));
+  const revealVersion=host.events.filter(e=>e[0]==='game_state').at(-1)[1].actionVersion;
+  assert.ok((await host.emit('player_action',{type:'ready',payload:{},actionVersion:revealVersion})).ok);
+  await new Promise(resolve=>{clients[1].ws.once('close',resolve);clients[1].ws.close();});
+  assert.ok((await host.emit('restart_to_lobby',null)).ok,'host can cancel while a reader is disconnected');
+  await new Promise(resolve=>setTimeout(resolve,50));
+  const lobby=host.events.filter(e=>e[0]==='game_state').at(-1)[1];
+  assert.equal(lobby.phase,'LOBBY');assert.equal(lobby.players.length,15);
+  assert.deepEqual(lobby.readyPlayers,[]);
+  assert.equal((await host.emit('player_action',{type:'ready',payload:{},actionVersion:revealVersion})).ok,false);
+  assert.equal((await host.emit('get_role_suggestion',null)).playerCount,15);
 });

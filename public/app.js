@@ -51,6 +51,7 @@ function $(id) { return document.getElementById(id); }
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
   $(id).classList.add('active');
+  window.villageArt?.refresh();
   window.gameChat?.mount(id);
   window.gameVoice?.mount(id);
 }
@@ -271,6 +272,7 @@ function renderLobby(gs) {
 
 function showReveal(privateState) {
   const role = privateState.role;
+  window.villageArt?.role(role);
   $('role-icon').textContent = role.icon;
   $('role-name').textContent = role.name;
   $('role-desc').textContent = role.desc;
@@ -512,6 +514,7 @@ socket.on('game_state', (gs) => {
   const previousRound = state.lastGameState?.actionRound;
   const prevPhase = state.lastGameState ? state.lastGameState.phase : null;
   state.lastGameState = gs;
+  window.villageArt?.update(gs);
 
   // Ban ngay nen sang, ban dem nen toi + doc dan chuyen khi vua chuyen sang mot pha moi
   document.documentElement?.classList?.toggle('theme-night', gs.phase.startsWith('NIGHT_'));

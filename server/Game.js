@@ -48,8 +48,10 @@ const DEFAULT_DURATIONS = {
 
 // Khi tat ca da bo phieu, khong chot ngay ma de lai ngan nay giay cho ai muon doi y.
 const CHANGE_VOTE_GRACE_MS = 5000;
-// Chia vai: nho 3 vai gan nhat cua moi nguoi, thu toi da 300 cach xao de tranh trung vai cu
-const ROLE_HISTORY_SIZE = 3;
+// Chia vai: chi nho vai cua van NGAY TRUOC, thu toi da 300 cach xao de tranh trung vai do.
+// Nho nhieu van hon thi it lap vai hon, nhung nguoi choi suy ra duoc vai cua minh:
+// ai lam Soi vai van lien tiep se biet chac van nay minh khong phai Soi.
+const ROLE_HISTORY_SIZE = 1;
 const DEAL_ATTEMPTS = 300;
 
 // Cac hanh dong duoc phep gui lai nhieu lan trong cung mot luot (doi phieu, nem ca chua/tang hoa).
@@ -289,7 +291,18 @@ class Game {
   // Lich nay ai cung biet, nen bo qua dem le khong lo gi; con Soi trang da chet thi
   // van phai goi dung lich de khong ai biet no da chet.
   _whiteWolfActsTonight() {
-    return this.nightNumber >= 2 && this.nightNumber % 2 === 0 && this._roleInGame('whitewolf');
+    if (!this._roleInGame('whitewolf')) return false;
+    // Het Dan lang ma Soi trang con song: phai cho no san MOI dem, neu khong van treo.
+    // Luc do ban dem bay Soi khong con ai de can, ban ngay chi con Soi bo phieu lan nhau,
+    // va Soi trang chi thang khi con mot minh - khong ai ket thuc duoc van.
+    // Khong lo lich o day, vi nhung nguoi con lai deu la Soi va deu biet dieu do.
+    if (this._hasAlivePlayerWithRole('whitewolf') && !this._villageSideAlive()) return true;
+    return this.nightNumber >= 2 && this.nightNumber % 2 === 0;
+  }
+
+  // Con ai thuoc phe Lang (khong phai Soi) con song khong
+  _villageSideAlive() {
+    return this.alivePlayers().some((p) => !isWolfTeam(p.role));
   }
 
   // Vai nay co nam trong bo vai cua van (bo vai cong khai cho ca phong) hay khong.
@@ -432,8 +445,9 @@ class Game {
     }
     if (this.phase === PHASE.HUNTER_SHOT && type === 'hunter_shoot') {
       if (player.id !== this.pendingHunterQueue[0]) return;
-      if (!this.players.get(payload.targetId)?.alive) return;
-      this._resolveHunterShot(payload.targetId);
+      // Khong co targetId = tu chon khong ban ai. Co thi phai la nguoi con song.
+      if (payload.targetId && !this.players.get(payload.targetId)?.alive) return;
+      this._resolveHunterShot(payload.targetId || null);
       this._continueAfterHunter(io, broadcastFn);
       return true;
     }
@@ -707,17 +721,13 @@ class Game {
     this._goToPhase(io, broadcastFn, PHASE.DAY_DISCUSSION);
   }
 
+  // targetId rong = Tho san bo qua, hoac het gio ma khong chon. Khi do KHONG ban ai ca:
+  // ban ngau nhien thay ho se giet oan mot nguoi chi vi nguoi choi roi mang hay ban di dau do.
   _resolveHunterShot(targetId) {
     const hunterId = this.pendingHunterQueue.shift();
-    let finalTarget = targetId;
-    if (!finalTarget) {
-      const candidates = this.alivePlayers().filter((p) => p.id !== hunterId);
-      if (candidates.length) {
-        finalTarget = candidates[Math.floor(Math.random() * candidates.length)].id;
-      }
-    }
+    if (!targetId) return;
     const hunter = this.players.get(hunterId);
-    if (finalTarget) this._applyDeaths(null, [finalTarget], { [finalTarget]: 'Bị Thợ săn ' + (hunter?.name || '') + ' bắn trước khi chết' });
+    this._applyDeaths(null, [targetId], { [targetId]: 'Bị Thợ săn ' + (hunter?.name || '') + ' bắn trước khi chết' });
   }
 
   _continueAfterHunter(io, broadcastFn) {
@@ -923,7 +933,7 @@ class Game {
       case PHASE.HUNTER_SHOT: {
         const hunterId = this.pendingHunterQueue[0];
         if (player.id === hunterId) {
-          return { action: 'hunter_shoot', message: 'Bạn đã chết! Chọn một người để bắn hạ trước khi ra đi', targets: others(true).map((p) => ({ id: p.id, name: p.name })) };
+          return { action: 'hunter_shoot', message: 'Bạn đã chết! Chọn một người để bắn hạ trước khi ra đi, hoặc ra đi lặng lẽ.', canSkip: true, targets: others(true).map((p) => ({ id: p.id, name: p.name })) };
         }
         return { action: null, message: 'Thợ săn đang trầm ngâm trước khi ra đi...' };
       }

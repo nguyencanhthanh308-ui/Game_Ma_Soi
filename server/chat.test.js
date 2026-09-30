@@ -11,7 +11,9 @@ test('voice metadata obeys channel privacy and payload is excluded from snapshot
   assert.equal(chat.send(game,wolf,{channel:'wolves',audio:{mime:'audio/webm',base64:'A'.repeat(190000)}},2000).ok,false);
   wolf.alive=false;villager.alive=false;
   assert.ok(chat.send(game,wolf,{channel:'dead',audio},3000).ok);
-  assert.equal(chat.snapshot(game,villager).messages[0].channel,'dead');
+  // Da mat thi theo doi duoc ca kenh Soi luc truoc lan kenh Am phu, nhung khong kem du lieu am thanh
+  assert.deepEqual(chat.snapshot(game,villager).messages.map(m=>m.channel),['wolves','dead']);
+  assert.deepEqual(chat.snapshot(game,villager).messages[1].audio,{mime:'audio/webm'});
 });
 
 test('replies use server-owned quotes and cannot expose private or pre-conversion messages', () => {
@@ -37,15 +39,18 @@ function setup() {
   return { chat: new Chat(), game: { phase: 'NIGHT_WOLVES', players: new Map(players.map(p => [p.id, p])) }, players };
 }
 
-test('wolf chat is delivered only to eligible wolves, never villagers or dead wolves', () => {
+test('wolf chat reaches only the pack and the dead, never a living villager', () => {
   const { chat, game, players: [wolf, cub, white, villager] } = setup();
   assert.ok(chat.send(game, wolf, { channel: 'wolves', text: 'Bite target' }).ok);
   for (const p of [wolf, cub, white]) assert.equal(chat.snapshot(game, p).messages.length, 1);
   assert.equal(chat.snapshot(game, villager).messages.length, 0);
   assert.equal(chat.send(game, villager, { channel: 'wolves', text: 'intruder' }).ok, false);
   cub.alive = false;
-  assert.equal(chat.snapshot(game, cub).messages.length, 0);
+  // Nguoi da mat nghe duoc bay Soi qua micro nen doc duoc luon kenh chu, nhung khong gui duoc nua
+  assert.equal(chat.snapshot(game, cub).messages.length, 1);
   assert.equal(chat.send(game, cub, { channel: 'wolves', text: 'dead' }).ok, false);
+  // Nguoi con song ngoai bay Soi thi van khong thay gi
+  assert.equal(chat.snapshot(game, villager).messages.length, 0);
   assert.equal('audience' in chat.snapshot(game, wolf).messages[0], false);
 });
 

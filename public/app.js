@@ -600,7 +600,7 @@ function renderActionArea(gs, priv) {
       if (!state.selected.length) return toast('Chọn một người.');
       send('seer_check', { targetId: state.selected[0] });
     } else if (prompt.action === 'hunter_shoot') {
-      if (!state.selected.length) return toast('Chọn một người.');
+      if (!state.selected.length) return toast('Chọn một người, hoặc bấm "Không bắn ai".');
       send('hunter_shoot', { targetId: state.selected[0] });
     } else if (prompt.action === 'day_vote') {
       send('day_vote', { targetId: state.selected[0] || null });
@@ -612,16 +612,18 @@ function renderActionArea(gs, priv) {
   }
   area.appendChild(confirmBtn);
 
-  if (prompt.action === 'whitewolf_kill' || prompt.action === 'day_vote' || prompt.action === 'guard_protect') {
+  if (prompt.action === 'whitewolf_kill' || prompt.action === 'day_vote' || prompt.action === 'guard_protect' || prompt.action === 'hunter_shoot') {
     const skip = document.createElement('button');
     skip.className = 'btn-secondary';
     skip.textContent = prompt.action === 'day_vote'
       ? ((gs.dayVotes || {})[state.playerId] ? 'Hủy phiếu (bỏ phiếu trắng)' : 'Bỏ phiếu trắng')
+      : prompt.action === 'hunter_shoot' ? 'Không bắn ai'
       : 'Bỏ qua';
     skip.addEventListener('click', () => {
       if (prompt.action === 'whitewolf_kill') send('whitewolf_kill', { targetId: null });
       if (prompt.action === 'day_vote') send('day_vote', { targetId: null });
       if (prompt.action === 'guard_protect') send('guard_protect', { targetId: null });
+      if (prompt.action === 'hunter_shoot') send('hunter_shoot', { targetId: null });
     });
     area.appendChild(skip);
   }

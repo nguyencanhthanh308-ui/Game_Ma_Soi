@@ -23,9 +23,12 @@ class Chat {
           : !PUBLIC_PHASES.has(game.phase) ? 'Kênh chung mở khi thảo luận và bỏ phiếu ban ngày.' : '',
       },
       wolves: {
-        canRead: wolves,
+        // Nguoi da mat nghe duoc bay Soi noi chuyen qua micro va da biet vai cua ca lang,
+        // nen cho ho doc luon kenh chu de hai duong khong lech nhau.
+        canRead: wolves || dead,
         canSend: wolves && game.phase.startsWith('NIGHT_'),
-        reason: 'Kênh riêng của bầy Sói mở vào ban đêm.',
+        reason: dead && !wolves ? 'Bạn đã mất nên chỉ có thể đọc kênh của bầy Sói.'
+          : 'Kênh riêng của bầy Sói mở vào ban đêm.',
       },
       dead: {
         canRead: dead,
@@ -37,11 +40,14 @@ class Chat {
 
   snapshot(game, player) {
     const permissions = this.permissions(game, player);
+    // Nguoi da mat khong nam trong audience cua tin nhan Soi (audience chi gom Soi con song
+    // luc gui), nen phai cho ho xem theo quyen doc thay vi theo audience.
+    const dead = !player.alive;
     return {
       permissions,
       messages: this.messages.filter(m => {
         if (m.channel === 'public') return true;
-        if (m.channel === 'wolves') return permissions.wolves.canRead && m.audience.includes(player.id);
+        if (m.channel === 'wolves') return permissions.wolves.canRead && (dead || m.audience.includes(player.id));
         if (m.channel === 'dead') return permissions.dead.canRead && m.audience.includes(player.id);
         return false;
       }).map(({ audience, replyAudience, audio, ...message }) => {

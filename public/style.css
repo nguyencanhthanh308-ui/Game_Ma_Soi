@@ -261,7 +261,9 @@ input::placeholder { color:#778e87; font-size:12px; }
 .lobby-card { max-width:690px; }
 .lobby-card h1 { font-size:32px; font-weight:400; margin-bottom:22px; }
 .compact-village { max-height:none; margin-bottom:25px; }
-.compact-village canvas { margin-top:0; height:clamp(200px, 22vw, 300px); object-fit:cover; object-position:50% 68%; }
+/* Be ngang canvas duoc village.js chinh theo dung ty le khung nen khong con bi cat.
+   cover chi con tac dung o man rat hep (dien thoai): khi do cat bot hai ben, giu giua. */
+.compact-village canvas { margin-top:0; height:clamp(200px, 22vw, 300px); object-fit:cover; object-position:50% 50%; }
 .room-header { padding:16px 0; border-bottom:1px solid var(--border); }
 .room-code { font:30px 'Courier New',monospace; letter-spacing:4px; }
 .room-code-label { font-size:10px; text-transform:uppercase; letter-spacing:2px; }
@@ -277,7 +279,7 @@ input::placeholder { color:#778e87; font-size:12px; }
 .phase-badge { border-radius:3px; background:#192c2b; border-color:#405044; flex-direction:row; justify-content:space-between; align-items:center; gap:12px; }
 .timer { font:28px 'Courier New',monospace; }
 .game-village { margin-bottom:22px; max-height:300px; }
-.game-village canvas { margin-top:0; height:280px; object-fit:cover; object-position:50% 65%; }
+.game-village canvas { margin-top:0; height:280px; object-fit:cover; object-position:50% 50%; }
 .village-phase-caption { position:absolute; bottom:12px; left:12px; padding:6px 10px; background:#102023e6; color:#e2d4ad; font:10px 'Courier New',monospace; letter-spacing:1px; }
 .phase-message { background:#24352a88; border-radius:2px; line-height:1.8; }
 .target-btn { border-radius:3px; background:#152725; border-color:#354a40; }

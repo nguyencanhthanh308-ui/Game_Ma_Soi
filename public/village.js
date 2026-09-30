@@ -84,12 +84,8 @@
     rect(ctx,wolf?'#efbb69':'#282c2d',x-1,y-8,1,2); rect(ctx,wolf?'#efbb69':'#282c2d',x+3,y-8,1,2);
     rect(ctx,'#dab575',x-3,y+3,9,1);
   }
-  function paint(canvas, time) {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const home = canvas.closest('#screen-home');
-    const day = !home && game && game.phase.startsWith('DAY_');
-    ctx.imageSmoothingEnabled=false;
+  // Lop nen: troi, sao, nui, rung, dat. Tach rieng de ve lap lai sang hai ben khi khung rong.
+  function backdrop(ctx, day) {
     rect(ctx,day?'#718e89':'#0c1e2a',0,0,480,280);
     rect(ctx,day?'#8caaa0':'#132b36',0,65,480,80);
     for(let i=0;i<58;i++) {
@@ -98,21 +94,59 @@
       rect(ctx,'#d1dec5',random(i)*480,random(i+8)*100,i%7===0?2:1,1);
     }
     ctx.globalAlpha=1;
-    for(let y=-20;y<=20;y+=2) {
-      const w=Math.floor(Math.sqrt(400-y*y));
-      rect(ctx,day?'#eee2ad':'#d8dfba',371-w,44+y,w*2,2);
-    }
-    rect(ctx,day?'#e5d799':'#abbfac',361,34,6,6); rect(ctx,day?'#e5d799':'#bdcdb1',375,48,9,4);
     poly(ctx,day?'#668d82':'#1e4046',[[0,131],[0,98],[48,65],[105,114],[164,55],[236,129],[306,86],[366,117],[422,66],[480,102],[480,150]]);
     poly(ctx,day?'#547c70':'#193a3e',[[0,142],[64,101],[142,140],[222,82],[304,137],[388,91],[480,149]]);
     for(let i=0;i<28;i++) pine(ctx,i*19-10,157+random(i+9)*12,48+random(i+15)*42,day?'#355d50':'#112d30');
     poly(ctx,day?'#496a4c':'#253f34',[[0,183],[64,164],[136,148],[231,161],[320,150],[405,178],[480,162],[480,280],[0,280]]);
     poly(ctx,day?'#627950':'#38523d',[[55,217],[146,165],[257,181],[349,164],[439,223],[400,280],[82,280]]);
-    poly(ctx,day?'#8b805d':'#5b5b42',[[240,173],[253,173],[259,209],[336,231],[343,242],[249,223],[187,252],[167,280],[136,280],[170,238],[231,206]]);
     for(let i=0;i<270;i++) {
       const x=random(i+70)*480,y=170+random(i+500)*110;
       rect(ctx,i%3===0?'#6b7450':day?'#536d46':'#294533',x,y,2+random(i+8)*3,1);
     }
+  }
+
+  // Khung tranh trong sanh cho va man choi rong hon nhieu so voi tranh goc 480x280.
+  // Truoc day dung object-fit: cover nen bi cat mat mat trang o tren va nha o duoi.
+  // Gio chinh be ngang canvas theo dung ty le khung, de ve vua khung ma khong cat, khong meo.
+  const WIDE_FRAMES = '.compact-village, .game-village';
+  function fitCanvas(canvas) {
+    if (!canvas.closest(WIDE_FRAMES)) return;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    const wanted = Math.max(480, Math.min(1440, Math.round(280 * w / h)));
+    if (canvas.width !== wanted) { canvas.width = wanted; canvas.height = 280; }
+  }
+
+  function paint(canvas, time) {
+    fitCanvas(canvas);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const home = canvas.closest('#screen-home');
+    const day = !home && game && game.phase.startsWith('DAY_');
+    ctx.imageSmoothingEnabled=false;
+    const W = canvas.width;
+    const ox = Math.round((W - 480) / 2); // tranh goc nam giua khung
+    if (ox > 0) {
+      // Hai ben la anh soi guong cua lop nen, nen cho noi voi tranh goc khop lien mach
+      ctx.save(); ctx.translate(ox, 0); ctx.scale(-1, 1); backdrop(ctx, day); ctx.restore();
+      ctx.save(); ctx.translate(ox + 960, 0); ctx.scale(-1, 1); backdrop(ctx, day); ctx.restore();
+      // Them sao ngau nhien de hai ben khong trong nhu doi xung hoan toan
+      for (let i = 0; i < Math.round(ox / 5); i++) {
+        ctx.globalAlpha = day ? .1 : .25 + random(i + 900) * .55;
+        const x = random(i + 700) * ox;
+        rect(ctx, '#d1dec5', random(i + 800) < .5 ? x : W - x, random(i + 600) * 60, i % 6 === 0 ? 2 : 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.save();
+    ctx.translate(ox, 0);
+    backdrop(ctx, day);
+    for(let y=-20;y<=20;y+=2) {
+      const w=Math.floor(Math.sqrt(400-y*y));
+      rect(ctx,day?'#eee2ad':'#d8dfba',371-w,44+y,w*2,2);
+    }
+    rect(ctx,day?'#e5d799':'#abbfac',361,34,6,6); rect(ctx,day?'#e5d799':'#bdcdb1',375,48,9,4);
+    poly(ctx,day?'#8b805d':'#5b5b42',[[240,173],[253,173],[259,209],[336,231],[343,242],[249,223],[187,252],[167,280],[136,280],[170,238],[231,206]]);
     house(ctx,112,146,.72,time,0); house(ctx,300,146,.78,time,1);
     house(ctx,56,192,.95,time,2); house(ctx,358,197,.92,time,3);
     // Campfire at the heart of the composition.
@@ -136,15 +170,18 @@
     }
     rect(ctx,'#f6d384',247,215,5,11);
     for(let i=0;i<5;i++){const rise=(time*12+i*7)%35;rect(ctx,'#dcb463',246+Math.sin(i+rise)*7,212-rise,1,2);}
-    // Foreground trees give the village a framed, diorama-like depth.
-    pine(ctx,19,258,128,day?'#224b3c':'#0c2427','#25423a');
-    pine(ctx,466,267,143,day?'#214939':'#0a2023','#243f36');
-    pine(ctx,440,291,94,'#0a2023'); pine(ctx,48,300,93,'#10292a');
     for(let i=0;i<12;i++) {
       ctx.globalAlpha=.2+.3*Math.sin(time+i);
       rect(ctx,'#e1c97d',70+random(i+1)*330,175+random(i+10)*80,2,2);
     }
     ctx.globalAlpha=1;
+    ctx.restore();
+    // Foreground trees give the village a framed, diorama-like depth.
+    // Khung rong thi cay dung o hai mep khung, de ngoi lang o giua khong bi che.
+    const right = W - 480; // bang 0 khi khung dung ty le goc
+    pine(ctx,19,258,128,day?'#224b3c':'#0c2427','#25423a');
+    pine(ctx,right+466,267,143,day?'#214939':'#0a2023','#243f36');
+    pine(ctx,right+440,291,94,'#0a2023'); pine(ctx,48,300,93,'#10292a');
   }
   // One character = one opaque pixel. Authored clusters, no antialiased paths.
   const wolfSprite = [
@@ -270,6 +307,7 @@
   else addEventListener('load',preloadArtwork,{once:true});
 
   window.villageArt={update(gs){game=gs;if(gs.phase==='LOBBY')currentRole=null;redraw();},role:setRole,refresh:()=>redraw()};
+  addEventListener('resize',()=>redraw());
   document.addEventListener('visibilitychange',syncMotion);
   reducedMotion.addEventListener('change',syncMotion);
   if(typeof state!=='undefined') {game=state.lastGameState;setRole(state.lastPrivate?.role);}

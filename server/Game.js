@@ -259,6 +259,11 @@ class Game {
     this._goToPhase(io, broadcastFn, firstPhase);
   }
 
+  // Luat chuan: Soi trang thuc day CACH MOT DEM, bat dau tu dem thu hai.
+  _whiteWolfActsTonight() {
+    return this.nightNumber >= 2 && this.nightNumber % 2 === 0 && this._hasAlivePlayerWithRole('whitewolf');
+  }
+
   _hasAlivePlayerWithRole(roleId) {
     return this.alivePlayers().some((p) => p.role === roleId);
   }
@@ -273,11 +278,8 @@ class Game {
     if (phase === PHASE.NIGHT_GUARD && !this._hasAlivePlayerWithRole('guard')) {
       return this._goToPhase(io, broadcastFn, PHASE.NIGHT_WOLVES);
     }
-    if (phase === PHASE.NIGHT_WHITEWOLF) {
-      const ww = this.alivePlayers().find((p) => p.role === 'whitewolf');
-      if (!ww || ww.hasUsedWhiteKill) {
-        return this._goToPhase(io, broadcastFn, PHASE.NIGHT_SEER);
-      }
+    if (phase === PHASE.NIGHT_WHITEWOLF && !this._whiteWolfActsTonight()) {
+      return this._goToPhase(io, broadcastFn, PHASE.NIGHT_SEER);
     }
     if (phase === PHASE.NIGHT_SEER && !this._hasAlivePlayerWithRole('seer')) {
       return this._goToPhase(io, broadcastFn, PHASE.NIGHT_WITCH);
@@ -438,12 +440,8 @@ class Game {
     }
 
     if (this.phase === PHASE.NIGHT_WHITEWOLF && type === 'whitewolf_kill' && player.role === 'whitewolf') {
-      if (!player.hasUsedWhiteKill) {
-        this.night.whiteWolfTarget = payload.targetId || 'skip';
-        if (payload.targetId) player.hasUsedWhiteKill = true;
-      } else {
-        this.night.whiteWolfTarget = 'skip';
-      }
+      this.night.whiteWolfTarget = payload.targetId || 'skip';
+      if (payload.targetId) player.hasUsedWhiteKill = true; // chi de hien thi, khong con chan luot sau
       this._goToPhase(io, broadcastFn, PHASE.NIGHT_SEER);
       return true;
     }
@@ -505,6 +503,7 @@ class Game {
 
     if (this.phase === PHASE.DAY_JUDGEMENT && type === 'judge_vote') {
       if (player.id === this.accusedId) return; // nguoi bi xu khong duoc tu bo phieu
+      if (player.loverId === this.accusedId && payload.verdict === 'kill') return; // khong bo phieu treo co nguoi minh yeu
       this.judgeVotes[player.id] = payload.verdict;
       const voters = this.alivePlayers().filter((p) => p.id !== this.accusedId);
       if (voters.every((p) => this.judgeVotes[p.id] !== undefined)) {
@@ -832,7 +831,7 @@ class Game {
       case PHASE.NIGHT_WHITEWOLF:
         if (player.role === 'whitewolf') {
           const teammates = alive.filter((p) => isWolfTeam(p.role) && p.id !== player.id);
-          return { action: 'whitewolf_kill', message: 'Bạn có thể giết một Sói đồng bọn (dùng 1 lần duy nhất)', targets: teammates.map((p) => ({ id: p.id, name: p.name })) };
+          return { action: 'whitewolf_kill', message: 'Bạn có thể giết một Sói đồng bọn (lượt này diễn ra cách một đêm)', targets: teammates.map((p) => ({ id: p.id, name: p.name })) };
         }
         return { action: null, message: '...' };
       case PHASE.NIGHT_SEER:
@@ -866,8 +865,9 @@ class Game {
         if (player.alive) {
           return {
             action: 'day_vote',
+            // Luat chuan: nguoi yeu khong duoc bo phieu chong lai nhau, nen an ho khoi danh sach
             message: 'Nêu tên người bạn nghi là Sói. Bạn có thể đổi phiếu cho tới khi hết giờ.',
-            targets: others(true).map((p) => ({ id: p.id, name: p.name })),
+            targets: others(true).filter((p) => p.id !== player.loverId).map((p) => ({ id: p.id, name: p.name })),
           };
         }
         return { action: null, message: 'Bạn đã mất, chỉ có thể quan sát' };
@@ -890,10 +890,15 @@ class Game {
           return { action: null, message: 'Cả làng đang phán quyết số phận của bạn.' };
         }
         if (!player.alive) return { action: null, message: `Cả làng đang phán quyết ${accused.name}.` };
+        // Nguoi yeu khong duoc gop phieu treo co nguoi minh yeu
+        const isLover = player.loverId === accused.id;
         return {
           action: 'judge_vote',
-          message: `Treo cổ ${accused.name} hay tha? Bạn có thể đổi ý cho tới khi hết giờ.`,
+          message: isLover
+            ? `${accused.name} là người yêu của bạn. Bạn chỉ có thể xin tha.`
+            : `Treo cổ ${accused.name} hay tha? Bạn có thể đổi ý cho tới khi hết giờ.`,
           accusedName: accused.name,
+          onlySpare: isLover,
           targets: [{ id: accused.id, name: accused.name }],
         };
       }

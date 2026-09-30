@@ -208,7 +208,7 @@ body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opa
 .header-note { color: var(--text-dim); font-size: 12px; }
 .edition { color: var(--text-dim); font: 10px 'Courier New', monospace; letter-spacing: 2px; }
 .edition span { color: var(--accent-2); padding-left: 12px; }
-.screen { min-height: calc(100svh - 96px); padding: 40px; position: relative; }
+.screen { min-height: calc(100vh - 96px); min-height: calc(100svh - 96px); padding: 40px; position: relative; }
 #screen-home.active { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 64px; align-items: center; max-width: 1240px; margin: auto; padding-top: 44px; padding-bottom: 48px; }
 .home-world { min-width: 0; }
 .eyebrow { color: var(--accent-2); font: 10px/1.6 'Courier New', monospace; letter-spacing: 2px; margin: 0 0 18px; }
@@ -260,8 +260,8 @@ input::placeholder { color:#778e87; font-size:12px; }
 .screen.chat-layout { padding-top:36px; }
 .lobby-card { max-width:690px; }
 .lobby-card h1 { font-size:32px; font-weight:400; margin-bottom:22px; }
-.compact-village { max-height:220px; margin-bottom:25px; }
-.compact-village canvas { margin-top:-35px; }
+.compact-village { max-height:none; margin-bottom:25px; }
+.compact-village canvas { margin-top:0; height:clamp(200px, 22vw, 300px); object-fit:cover; object-position:50% 68%; }
 .room-header { padding:16px 0; border-bottom:1px solid var(--border); }
 .room-code { font:30px 'Courier New',monospace; letter-spacing:4px; }
 .room-code-label { font-size:10px; text-transform:uppercase; letter-spacing:2px; }
@@ -316,10 +316,10 @@ input::placeholder { color:#778e87; font-size:12px; }
   .world-facts>div { flex:1; flex-direction:column; align-items:flex-start; gap:5px; }
   .world-facts strong { white-space:nowrap; }
   .world-facts span { max-width:none; }
-  .screen { padding:24px 16px; min-height:calc(100svh - 78px); }
+  .screen { padding:24px 16px; min-height:calc(100vh - 78px); min-height:calc(100svh - 78px); }
   .screen.chat-layout { gap:20px; padding-top:24px; }
   .game-layout { padding:0; } .game-village { max-height:220px; } .game-village canvas { margin-top:0; height:190px; }
-  .compact-village { max-height:190px; } .compact-village canvas { margin-top:0; }
+  .compact-village canvas { height:190px; }
   .card { padding:22px; } .room-chat { padding:20px; }
   .scene-caption { font-size:7px; padding:10px; letter-spacing:.7px; } .scene-footer { font-size:8px; padding:10px; }
 }
@@ -496,6 +496,7 @@ body { transition: background .6s ease, color .6s ease; }
 /* Dong liet ke bo vai nam ngay duoi tieu de can trai, nen cung can trai cho thang hang */
 #shared-role-config { text-align: left; }
 /* Ngoai phong choi thi ca hai khung deu .hidden -> an luon cot de no khong chiem cho */
+.room-side.side-empty { display: none; }
 .room-side:not(:has(> section:not(.hidden))) { display: none; }
 
 /* ---- Cot ben phai: chi danh sach tin nhan duoc cuon ----
@@ -504,7 +505,8 @@ body { transition: background .6s ease, color .6s ease; }
    thanh cuon keo dai qua ca voice lan chat. Phan chieu cao thieu chi lay tu danh sach
    tin nhan, nen do la thanh cuon duy nhat va nam gon trong khung chat. */
 @media (min-width: 960px) {
-  .room-side { max-height: calc(100svh - 48px); overflow: hidden; }
+  /* 100svh chi co tu Safari 15.4; khai bao 100vh truoc de trinh duyet cu van co gioi han */
+  .room-side { max-height: calc(100vh - 48px); max-height: calc(100svh - 48px); overflow: hidden; }
   /* Binh thuong khung thoai giu dung chieu cao noi dung nen khong co thanh cuon rieng:
      ca cot chi co dung mot thanh cuon la danh sach tin nhan.
      Chi khi bat camera (luoi video lam no cao han len) thi moi cho no co lai va tu cuon. */
@@ -514,7 +516,15 @@ body { transition: background .6s ease, color .6s ease; }
   /* Tieu de, nut kenh, khung soan tin giu nguyen chieu cao; chi danh sach tin nhan co lai */
   .room-side > .room-chat > * { flex-shrink: 0; }
   /* min-height de danh sach tin nhan khong bi ep xuong con vai chuc pixel */
-  .room-side > .room-chat .chat-messages { flex: 1 1 auto; height: clamp(200px, 50vh, 520px); min-height: 132px; }
+  .room-side > .room-chat .chat-messages { flex: 1 1 auto; height: clamp(200px, 50vh, 520px); min-height: 104px; }
+}
+
+/* Cot ben phai chi cao bang man hinh: thu gon dem va danh sach de khung soan tin
+   khong bi day ra ngoai, ma khung thoai cung khong can thanh cuon rieng. */
+@media (min-width: 960px) {
+  .room-side > .room-voice { padding: 16px; }
+  .room-side > .room-chat { padding: 18px; }
+  .room-side .voice-peer-list { max-height: 72px; }
 }
 
 /* Thu gon khung voice va phan dau khung chat de danh cho cho danh sach tin nhan */
@@ -583,7 +593,7 @@ body { transition: background .6s ease, color .6s ease; }
 /* Da thay mat kem ten roi thi khong can lap lai danh sach ten nua, danh cho cho khung chat */
 .room-voice.has-video .voice-peer-list { display: none; }
 .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 12px 0 4px; max-height: 232px; overflow-y: auto; }
-.video-tile { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border: 1px solid var(--border); border-radius: 4px; background: #0b1417; }
+.video-tile { position: relative; min-height: 72px; aspect-ratio: 4 / 3; overflow: hidden; border: 1px solid var(--border); border-radius: 4px; background: #0b1417; }
 .video-tile.mine { border-color: var(--accent-2); }
 .video-tile video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
 .video-name {
@@ -591,3 +601,64 @@ body { transition: background .6s ease, color .6s ease; }
   font-size: 10px; color: #f2eddc; background: #000000a8;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* ==========================================================================
+   MAN HINH RONG: tan dung hai le trong hai ben
+   O man 1600px tro len, the chinh va cot ben phai deu duoc noi rong ra,
+   va bang cau hinh vai tro xep thanh 2 cot cho do phai cuon dai.
+   ========================================================================== */
+@media (min-width: 1500px) {
+  .screen.chat-layout { gap: 32px; }
+  .lobby-card { max-width: 1040px; }
+  .game-layout { max-width: 1040px; }
+  .room-side { flex-basis: 420px; }
+  .video-grid { grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); }
+}
+@media (min-width: 1100px) {
+  /* 16 vai tro xep mot cot thi danh sach rat dai; man du rong thi xep 2 cot */
+  .lobby-card .role-config-grid { grid-template-columns: 1fr auto 1fr auto; column-gap: 26px; }
+}
+@media (min-width: 1700px) {
+  .site-header { max-width: 1560px; }
+  .lobby-card { max-width: 1140px; }
+  .game-layout { max-width: 1140px; }
+}
+
+/* ==========================================================================
+   LUOI CAMERA GIUA MAN HINH (ban ngay)
+   Chiem dung cho cua khung tranh ngoi lang - khoang 18-20% man hinh - nen
+   khong che danh sach nguoi choi, nut hanh dong hay khung chat.
+   Theo huong dan thiet ke luoi video: hien vua phai (6-9 o), o co ty le 4:3,
+   be rong chia theo % de tu thich nghi voi moi co man.
+   ========================================================================== */
+.video-stage { margin-bottom: 22px; }
+.video-grid.on-stage {
+  /* Dung flex thay grid de hang cuoi thieu o van duoc can giua.
+     Be ngang moi o do voice.js tinh sao cho o to nhat co the. */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  gap: 10px;
+  max-height: min(46vh, 380px);
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #0b141799;
+}
+:root.theme-day .video-grid.on-stage { background: #cfc5a355; }
+.video-grid.on-stage .video-tile { border-radius: 4px; width: var(--tile-w, 200px); flex: 0 0 auto; }
+.video-grid.on-stage .video-name { font-size: 12px; padding: 4px 8px; }
+/* Man hep thi o nho lai de van du 2 o mot hang */
+/* Dien thoai: man doc nen phai chua han cho danh sach nguoi choi va nut bam ben duoi */
+@media (max-width: 760px) {
+  .video-grid.on-stage { max-height: 34vh; padding: 8px; }
+}
+@media (min-width: 1500px) {
+  .video-grid.on-stage { max-height: min(48vh, 440px); }
+}
+
+/* Nut micro dang bat: vien sang de biet minh dang mo tieng */
+.mic-live { box-shadow: 0 0 0 2px var(--wolf) inset; }
+.voice-peer-list li.peer-failed { opacity: .6; }

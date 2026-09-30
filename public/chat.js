@@ -83,6 +83,11 @@
         list.scrollTop = list.scrollHeight;
       }
     }
+    {
+      // Du phong cho :has(): an cot ben phai khi ca hai khung deu dang an
+      const side = $('room-side');
+      if (side) side.classList.toggle('side-empty', [...side.children].every((el) => el.classList.contains('hidden')));
+    }
   }
 
   function render() {
@@ -235,7 +240,9 @@
   });
   socket.on('chat_state', data => {
     for (const ch of ['wolves', 'dead']) {
-      const latest = data.messages.filter(m => m.channel === ch).at(-1)?.id || 0;
+      // .at() chi co tu Safari 15.4 - dung cach lay phan tu cuoi chay duoc o moi trinh duyet
+      const inChannel = data.messages.filter(m => m.channel === ch);
+      const latest = (inChannel.length ? inChannel[inChannel.length - 1].id : 0) || 0;
       if (latest > lastSeenId[ch] && channel !== ch) unread[ch] += data.messages.filter(m => m.channel === ch && m.id > lastSeenId[ch]).length;
       lastSeenId[ch] = latest;
     }

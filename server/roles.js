@@ -181,48 +181,49 @@ function isWolfTeam(roleId) {
 
 // Cong thuc de xuat so luong vai tro theo tong so nguoi choi.
 // Duoc thiet ke chinh cho 12-15 nguoi nhung van hop ly voi cac so luong khac.
+// So Soi goi y theo so nguoi choi. Bam theo bang quen thuoc cua Ma Soi ban co
+// (xap xi 1 Soi tren moi 4 nguoi). Hai moc quan trong:
+//   - Tu 6 nguoi tro xuong chi 1 Soi: 2 Soi o co nay lam Dan lang gan nhu khong the thang.
+//   - 7 nguoi la co nho nhat ma 2 Soi choi duoc.
+function suggestedWolfCount(n) {
+  if (n < 2) return 0;
+  if (n <= 6) return 1;
+  if (n <= 11) return 2;
+  if (n <= 15) return 3;
+  if (n <= 19) return 4;
+  return 5;
+}
+
+// Cac vai co nang luc cua phe Dan, them dan khi phong dong len.
+// Phong cang dong thi cang nhieu vai dac biet, nhung Dan lang thuong van la
+// nhom dong nhat - do la chu y cua tro choi, khong phai loi chia vai.
+const VILLAGE_POWER_ROLES = [
+  ['seer', 3],
+  ['witch', 5],
+  ['guard', 7],
+  ['hunter', 8],
+  ['cupid', 10],
+  ['elder', 12],
+  ['prince', 14],
+];
+
 function getDefaultRoleConfig(n) {
   const config = Object.fromEntries(Object.keys(ROLE_INFO).map(id => [id, 0]));
+  if (n < 1) return config;
 
-  if (n < 6) {
-    config.werewolf = n >= 2 ? 1 : 0;
-    config.seer = n >= 3 ? 1 : 0;
-    config.villager = Math.max(0, n - config.werewolf - config.seer);
-    return config;
-  }
+  const wolves = suggestedWolfCount(n);
+  // Soi con va Soi trang thay cho Soi thuong, khong cong them vao tong so Soi
+  config.wolfcub = n >= 9 && wolves >= 2 ? 1 : 0;
+  config.whitewolf = n >= 12 && wolves >= 3 ? 1 : 0;
+  config.werewolf = Math.max(0, wolves - config.wolfcub - config.whitewolf);
 
-  if (n >= 6) {
-    config.seer = 1;
-    config.witch = 1;
+  let used = wolves;
+  for (const [role, minPlayers] of VILLAGE_POWER_ROLES) {
+    if (n < minPlayers || used >= n) break;
+    config[role] = 1;
+    used += 1;
   }
-  if (n >= 8) {
-    config.guard = 1;
-    config.hunter = 1;
-  }
-  if (n >= 9) {
-    config.cupid = 1;
-    config.wolfcub = 1;
-  }
-  if (n >= 11) {
-    config.whitewolf = 1;
-  }
-
-  const specialWolves = config.wolfcub + config.whitewolf;
-  const wolvesTotal = Math.max(2, Math.round(n / 3.2));
-  config.werewolf = Math.max(0, wolvesTotal - specialWolves);
-
-  const used =
-    config.werewolf +
-    config.wolfcub +
-    config.whitewolf +
-    config.seer +
-    config.guard +
-    config.witch +
-    config.hunter +
-    config.cupid;
-
   config.villager = Math.max(0, n - used);
-
   return config;
 }
 
@@ -280,6 +281,7 @@ module.exports = {
   getRoleInfo,
   isWolfTeam,
   getDefaultRoleConfig,
+  suggestedWolfCount,
   validateRoleConfig,
   expandRoleConfig,
   SINGLE_ONLY_ROLES,

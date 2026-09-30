@@ -10,7 +10,17 @@
   const hint = $('voice-hint');
   const peerListEl = $('voice-peer-list');
 
-  const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+  // Nhieu may chu STUN de con duong du phong khi mot may khong tra loi.
+  // Luu y: chi co STUN thi mot so mang (NAT doi xung, wifi cong ty) van khong noi duoc
+  // truc tiep voi nhau - truong hop do can them may chu TURN.
+  const RTC_CONFIG = {
+    iceServers: [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+      { urls: 'stun:stun.cloudflare.com:3478' },
+    ],
+    iceCandidatePoolSize: 4,
+  };
+  const RETRY_DELAY_MS = 2500;
   const CHANNEL_LABEL = {
     village: '🏘️ Kênh: Làng (ai còn sống cũng nghe được)',
     wolves: '🐺 Kênh: Bầy Sói (riêng tư, chỉ Sói còn sống)',
@@ -49,17 +59,31 @@
   const modeOf = (peerId) => v.roster.find((p) => p.playerId === peerId)?.mode || 'both';
   const sends = (peerId) => DIRECTION[modeOf(peerId)] !== 'recvonly';
   const listenBtn=document.createElement('button');
-  listenBtn.className='btn-secondary small listen-btn';
-  listenBtn.textContent='🔊 Nghe trò chuyện';
-  // Xuong hang rieng: de chung hang voi nut micro va camera thi ba nut bi gay chu
+  // Chi hien khi trinh duyet that su chan tieng (chinh sach tu dong phat).
+  // Phan lon truong hop khong can, va de san thi no chiem han mot hang trong khung thoai.
+  listenBtn.className='btn-secondary small listen-btn hidden';
+  listenBtn.textContent='🔊 Bấm để nghe mọi người';
   (camBtn.parentNode||micBtn).after(listenBtn);
   function playRemote(audio) {
-    audio.play().catch(()=>{hint.textContent='Bấm Nghe trò chuyện để phát tiếng. Không cần bật mic.';});
+    audio.play().then(()=>{
+      listenBtn.classList.add('hidden');
+    }).catch(()=>{
+      listenBtn.classList.remove('hidden');
+      hint.textContent='Trình duyệt đang chặn tiếng. Bấm "Bấm để nghe mọi người" một lần là nghe được.';
+    });
   }
   function unlockRemote() { v.audioEls.forEach(playRemote);sharedAudioContext?.resume().catch(()=>{}); }
   listenBtn.addEventListener('click',unlockRemote);
   document.addEventListener('pointerdown',unlockRemote);
   document.addEventListener('keydown',unlockRemote);
+
+  // Du phong cho :has() (Safari/Firefox cu chua ho tro): tu bat/tat class khi ca hai khung deu an
+  function syncSideEmpty() {
+    const side = $('room-side');
+    if (!side) return;
+    const anyVisible = [...side.children].some((el) => !el.classList.contains('hidden'));
+    side.classList.toggle('side-empty', !anyVisible);
+  }
 
   function mount(id) {
     const active = id || document.querySelector('.screen.active')?.id;
@@ -71,6 +95,7 @@
       const side = $('room-side');
       if (side.parentNode !== target) target.appendChild(side);
     }
+    syncSideEmpty();
   }
 
   // ---------- Luoi camera ----------
@@ -91,11 +116,71 @@
     tile.querySelector('.video-name').textContent = label;
     return tile.querySelector('video');
   }
+  // Ban ngay ca lang nhin mat nhau ma noi chuyen, nen luoi cam duoc dua ra giua man hinh,
+  // dung cho khung tranh ngoi lang (von chi de trang tri) thay vi de o cot ben phai.
+  // Cac pha khac thi tra lai cot ben phai de khong choan cho.
+  const STAGE_PHASES = ['DAY_DISCUSSION', 'DAY_VOTE', 'DAY_DEFENSE', 'DAY_JUDGEMENT', 'DAY_ANNOUNCE'];
+  function placeVideoGrid() {
+    const stage = $('video-stage');
+    const hasVideo = videoGrid.childElementCount > 0;
+    const phase = state.lastGameState?.phase;
+    const onStage = hasVideo && stage && STAGE_PHASES.includes(phase)
+      && document.querySelector('.screen.active')?.id === 'screen-game';
+
+    if (onStage && videoGrid.parentNode !== stage) stage.appendChild(videoGrid);
+    else if (!onStage && videoGrid.parentNode !== panel) {
+      // Tra ve dung cho cu trong khung thoai: ngay sau doan goi y
+      panel.insertBefore(videoGrid, $('voice-peer-list'));
+    }
+    stage?.classList.toggle('hidden', !onStage);
+    videoGrid.classList.toggle('on-stage', onStage);
+    panel.classList.toggle('has-video', videoGrid.childElementCount > 0 && !onStage);
+    // Khung tranh ngoi lang nhuong cho cho luoi cam
+    document.querySelector('.game-village')?.classList.toggle('hidden', onStage);
+    sizeStageGrid();
+  }
+
+  // Chon so cot sao cho moi o to nhat co the trong khung cho san (cach lam quen thuoc
+  // cua cac ung dung hop truc tuyen). O giu ty le 4:3.
+  function sizeStageGrid() {
+    if (!videoGrid.classList.contains('on-stage')) {
+      videoGrid.style.removeProperty('--cols');
+      videoGrid.style.removeProperty('--tile-w');
+      return;
+    }
+    const n = videoGrid.childElementCount;
+    if (!n) return;
+    const gap = 10;
+    const width = videoGrid.clientWidth - 24; // tru padding hai ben
+    const height = Math.min(innerHeight * 0.46, 380) - 24;
+    if (width <= 0 || height <= 0) return;
+    let bestCols = 1;
+    let bestArea = 0;
+    let bestWidth = width;
+    for (let cols = 1; cols <= n; cols++) {
+      const rows = Math.ceil(n / cols);
+      const tileW = (width - gap * (cols - 1)) / cols;
+      const tileH = (height - gap * (rows - 1)) / rows;
+      if (tileW <= 0 || tileH <= 0) continue;
+      // O giu ty le 4:3 nen canh nao be hon se quyet dinh kich thuoc that
+      const w = Math.min(tileW, tileH * 4 / 3);
+      const area = w * (w * 3 / 4);
+      if (area > bestArea) { bestArea = area; bestCols = cols; bestWidth = w; }
+    }
+    videoGrid.style.setProperty('--cols', bestCols);
+    // Dat be ngang o cu the de hang cuoi (neu thieu o) van duoc can giua
+    videoGrid.style.setProperty('--tile-w', Math.floor(bestWidth) + 'px');
+  }
+  addEventListener('resize', sizeStageGrid);
+
   function syncGridVisibility() {
     const hasVideo = videoGrid.childElementCount > 0;
     videoGrid.classList.toggle('hidden', !hasVideo);
-    // Bao cho bo cuc biet khung thoai dang cao han binh thuong (xem style.css)
-    panel.classList.toggle('has-video', hasVideo);
+    placeVideoGrid();
+    // Chi danh dau khung thoai la "cao hon binh thuong" khi luoi cam THUC SU nam trong no.
+    // Luoi da chuyen ra giua man hinh ma van danh dau thi khung thoai bi co lai va cat mat chu.
+    panel.classList.toggle('has-video', hasVideo && videoGrid.parentNode === panel);
+    sizeStageGrid();
   }
   function attachRemoteVideo(peerId, stream) {
     const name = v.roster.find((p) => p.playerId === peerId)?.name || 'Người chơi';
@@ -146,7 +231,13 @@
       const dot = document.createElement('span');
       dot.className = 'dot';
       const name = document.createElement('span');
-      name.textContent = p.name;
+      const st = peerStatus.get(p.playerId);
+      // Bao ro khi khong noi duoc voi ai do, thay vi im lang de nguoi choi tu doan
+      const label = st === 'gave-up' ? ' · không kết nối được'
+        : st === 'failed' || st === 'disconnected' ? ' · đang kết nối lại…'
+        : st === 'connected' || st === undefined ? '' : ' · đang kết nối…';
+      name.textContent = p.name + label;
+      if (st === 'gave-up') li.classList.add('peer-failed');
       li.append(dot, name);
       peerListEl.appendChild(li);
     });
@@ -154,7 +245,9 @@
 
   // Dong bo kenh + danh sach peer moi khi nhan private_state moi tu server (goi tu app.js)
   function syncVoiceChannel(priv) {
-    if(!window.RTCPeerConnection){micBtn.disabled=true;hint.textContent='Trình duyệt không hỗ trợ trò chuyện thoại.';return;}
+    if(!window.RTCPeerConnection){micBtn.disabled=true;camBtn.disabled=true;hint.textContent='Trình duyệt này không hỗ trợ trò chuyện thoại. Hãy dùng Chrome, Edge, Firefox hoặc Safari bản mới.';return;}
+    const blocked=mediaUnavailableReason();
+    if(blocked){micBtn.disabled=true;camBtn.disabled=true;hint.textContent=blocked;}
     const nextChannel=priv.voiceChannel||null;
     const nextRoster=priv.voicePeers||[];
     if(nextChannel!==v.channel) {v.epoch++;for(const pid of [...v.peers.keys()])destroyVoicePeer(pid);}
@@ -163,6 +256,8 @@
     }
     v.channel = priv.voiceChannel || null;
     v.roster = priv.voicePeers || [];
+    if (v.channel) autoEnableMic();
+    placeVideoGrid();
     v.localStream?.getAudioTracks().forEach(t=>{t.enabled=!!v.channel;});
     updateLabels();
     renderPeerList();
@@ -200,6 +295,17 @@
       ]);
     }
 
+    // Ket noi WebRTC co the hong giua chung (doi mang, NAT, wifi chap chon).
+    // Truoc day khong co gi bat lai nen hong la mat tieng/mat hinh vinh vien.
+    pc.onconnectionstatechange = () => {
+      if (v.peers.get(peerId) !== pc) return;
+      const st = pc.connectionState;
+      peerStatus.set(peerId, st);
+      renderPeerList();
+      if (st === 'failed' || st === 'disconnected') scheduleRetry(peerId, pc);
+      if (st === 'connected') { retryCount.delete(peerId); clearTimeout(retryTimers.get(peerId)); retryTimers.delete(peerId); }
+    };
+
     pc.onicecandidate = (e) => {
       if (e.candidate && v.peers.get(peerId)===pc) socket.emit('voice_signal', { toPlayerId: peerId, data: { type: 'candidate', candidate: e.candidate, channel:v.channel, toSocketId:v.roster.find(p=>p.playerId===peerId)?.socketId } });
     };
@@ -222,6 +328,9 @@
       if (!audioEl) {
         audioEl = document.createElement('audio');
         audioEl.autoplay = true;
+        // iOS Safari chan phat media toan man hinh; playsinline cho phep phat ngay trong trang
+        audioEl.playsInline = true;
+        audioEl.setAttribute('playsinline', '');
         document.body.appendChild(audioEl);
         v.audioEls.set(peerId, audioEl);
       }
@@ -245,11 +354,34 @@
     return pc;
   }
 
+  // Dung lai ket noi voi mot nguoi sau khi hong. Gian cach tang dan, toi da 5 lan.
+  const retryTimers = new Map();
+  const retryCount = new Map();
+  const peerStatus = new Map();
+  function scheduleRetry(peerId, pc) {
+    if (retryTimers.has(peerId)) return;
+    const tries = retryCount.get(peerId) || 0;
+    if (tries >= 5) { peerStatus.set(peerId, 'gave-up'); renderPeerList(); return; }
+    const epoch = v.epoch;
+    const timer = setTimeout(() => {
+      retryTimers.delete(peerId);
+      if (epoch !== v.epoch || v.peers.get(peerId) !== pc) return;
+      const peer = v.roster.find((p) => p.playerId === peerId);
+      if (!peer) return;
+      retryCount.set(peerId, tries + 1);
+      destroyVoicePeer(peerId);
+      createVoicePeer(peerId, state.playerId < peerId);
+    }, RETRY_DELAY_MS * (tries + 1));
+    timer.unref?.();
+    retryTimers.set(peerId, timer);
+  }
+
   function destroyVoicePeer(peerId) {
     const pc = v.peers.get(peerId);
     if (pc) { try { pc.close(); } catch (e) {} v.peers.delete(peerId); }
     pc?.stopIndicator?.();
     v.senders.delete(peerId);v.videoSenders.delete(peerId);v.ice.delete(peerId);v.chains.delete(peerId);
+    clearTimeout(retryTimers.get(peerId));retryTimers.delete(peerId);
     const audioEl = v.audioEls.get(peerId);
     if (audioEl) { audioEl.srcObject = null; audioEl.remove(); v.audioEls.delete(peerId); }
     removeRemoteVideo(peerId);
@@ -291,33 +423,57 @@
     ]);
   }
 
-  micBtn.addEventListener('click', async () => {
-    if(v.busy||!v.channel)return;
-    v.busy=true;micBtn.disabled=true;
-    const epoch=v.epoch;
+  // Trinh duyet chi cho lay micro/camera khi trang chay tren HTTPS hoac localhost.
+  function mediaUnavailableReason() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      return window.isSecureContext === false
+        ? 'Trang đang chạy qua HTTP nên trình duyệt chặn micro và camera. Hãy mở bằng địa chỉ HTTPS hoặc localhost.'
+        : 'Trình duyệt này không hỗ trợ micro và camera.';
+    }
+    return null;
+  }
+
+  async function setMic(on, { quiet = false } = {}) {
+    if (v.busy || !v.channel || v.micOn === on) return false;
+    const blocked = mediaUnavailableReason();
+    if (on && blocked) { if (!quiet) toast(blocked); return false; }
+    v.busy = true; micBtn.disabled = true;
+    const epoch = v.epoch;
     try {
-    if (!v.micOn) {
-      try {
-        v.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        if(epoch!==v.epoch||!v.channel){v.localStream.getTracks().forEach(t=>t.stop());v.localStream=null;return;}
-      } catch (e) {
-        toast('Không thể mở micro: ' + (e.message || e.name));
-        return;
-      }
-      v.micOn = true;
-      micBtn.textContent = '🔴 Tắt micro';
-    } else {
-      v.micOn = false;
-      micBtn.textContent = '🎤 Bật micro';
-      if (v.localStream) {
-        v.localStream.getTracks().forEach((t) => t.stop());
+      if (on) {
+        try {
+          v.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          if (epoch !== v.epoch || !v.channel) { v.localStream.getTracks().forEach(t => t.stop()); v.localStream = null; return false; }
+        } catch (e) {
+          // Tu bat luc vao phong ma bi tu choi quyen thi khong lam phien bang thong bao loi
+          if (!quiet) toast('Không thể mở micro: ' + (e.message || e.name));
+          return false;
+        }
+        v.micOn = true;
+      } else {
+        v.micOn = false;
+        v.localStream?.getTracks().forEach((t) => t.stop());
         v.localStream = null;
       }
-    }
-    await refreshAllPeersWithCurrentStream();
-    } catch(e) {toast('Không thể cập nhật micro: '+e.message);}
-    finally {v.busy=false;micBtn.disabled=!v.channel;}
-  });
+      micBtn.textContent = v.micOn ? '🔴 Tắt micro' : '🎤 Bật micro';
+      micBtn.classList.toggle('mic-live', v.micOn);
+      await refreshAllPeersWithCurrentStream();
+      return true;
+    } catch (e) { if (!quiet) toast('Không thể cập nhật micro: ' + e.message); return false; }
+    finally { v.busy = false; micBtn.disabled = !v.channel; }
+  }
+
+  micBtn.addEventListener('click', () => setMic(!v.micOn));
+
+  // Vao phong la mic bat san (nhu cac ung dung hop truc tuyen), ai muon thi tu tat.
+  // Chi thu dung mot lan moi phien de khong hoi quyen lien tuc.
+  let autoMicTried = false;
+  async function autoEnableMic() {
+    if (autoMicTried || v.micOn || !v.channel || mediaUnavailableReason()) return;
+    autoMicTried = true;
+    const ok = await setMic(true, { quiet: true });
+    if (!ok) hint.textContent = 'Chưa bật được micro tự động. Bấm "Bật micro" để nói.';
+  }
 
   camBtn.addEventListener('click', async () => {
     if (v.busy || !v.channel) return;
@@ -325,6 +481,8 @@
     const epoch = v.epoch;
     try {
       if (!v.camOn) {
+        const blocked = mediaUnavailableReason();
+        if (blocked) { toast(blocked); return; }
         try {
           v.camStream = await navigator.mediaDevices.getUserMedia({
             video: { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15 } },
@@ -403,7 +561,8 @@
   socket.on('disconnect', () => {
     v.epoch++;v.channel=null;v.roster=[];
     for (const pid of [...v.peers.keys()]) destroyVoicePeer(pid);
-    v.localStream?.getTracks().forEach(t=>t.stop());v.localStream=null;v.micOn=false;
+    v.localStream?.getTracks().forEach(t=>t.stop());v.localStream=null;v.micOn=false;autoMicTried=false;
+    micBtn.classList.remove('mic-live');
     v.camStream?.getTracks().forEach(t=>t.stop());v.camStream=null;v.camOn=false;
     syncLocalVideo();
     micBtn.textContent='🎤 Bật micro';micBtn.disabled=true;
@@ -413,5 +572,5 @@
 
   updateLabels();
   renderPeerList();
-  window.gameVoice = { mount, syncVoiceChannel };
+  window.gameVoice = { mount, syncVoiceChannel, placeVideoGrid };
 })();

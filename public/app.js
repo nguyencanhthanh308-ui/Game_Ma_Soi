@@ -648,7 +648,9 @@ function renderJudgement(gs, prompt, area) {
   const mine = (gs.judgeVotes || {})[state.playerId];
   const row = document.createElement('div');
   row.className = 'action-buttons judge-buttons';
-  [['kill', '⚰️ Treo cổ'], ['spare', '🕊️ Tha']].forEach(([verdict, text]) => {
+  // Nguoi yeu khong duoc gop phieu treo co nguoi minh yeu (luat chuan)
+  const choices = prompt.onlySpare ? [['spare', '🕊️ Xin tha']] : [['kill', '⚰️ Treo cổ'], ['spare', '🕊️ Tha']];
+  choices.forEach(([verdict, text]) => {
     const btn = document.createElement('button');
     btn.className = verdict === 'kill' ? 'btn-primary' : 'btn-secondary';
     btn.classList.toggle('selected', mine === verdict);
@@ -787,6 +789,7 @@ socket.on('game_state', (gs) => {
   if (prevPhase !== gs.phase || previousRound !== gs.actionRound) state.submittedForPhase = null;
 
   $('phase-title').textContent = PHASE_LABEL[gs.phase] || gs.phase;
+  window.gameVoice?.placeVideoGrid();
   renderGamePlayerList(gs);
 
   if (state.lastPrivate) renderActionArea(gs, state.lastPrivate);

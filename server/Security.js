@@ -132,6 +132,9 @@ function validSocketData(event, data) {
     case 'chat_send': return object(data); // Chat.send validates content, size and channel permissions.
     case 'kick_player': return object(data) && string(data.playerId);
     case 'cam_state': return object(data) && typeof data.on === 'boolean' && onlyKeys(data, ['on']);
+    case 'relay_set': return object(data) && string(data.peerId) && typeof data.on === 'boolean' && (data.opus === undefined || typeof data.opus === 'boolean') && onlyKeys(data, ['peerId', 'on', 'opus']);
+    // Goi tieng noi la du lieu nhi phan; audio-relay.validFramePacket kiem tra ky hinh dang
+    case 'voice_frame': return data instanceof Uint8Array || Buffer.isBuffer(data) || data instanceof ArrayBuffer;
     case 'get_role_suggestion': case 'restart_to_lobby': case 'leave_room': case 'get_ice_servers': return data == null;
     default: return false;
   }

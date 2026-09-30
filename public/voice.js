@@ -273,6 +273,7 @@
       const label = st === 'gave-up' ? ' · không kết nối được'
         : st === 'failed' || st === 'disconnected' ? ' · đang kết nối lại…'
         : st === 'connected' ? (peerRoute.get(p.playerId) === 'relay' ? ' · qua máy chủ trung gian' : '')
+        : window.voiceRelay?.active().includes(p.playerId) ? ' · nghe qua server (không có hình)'
         : st === undefined ? '' : ' · đang kết nối…';
       name.textContent = p.name + label;
       if (st === 'gave-up') li.classList.add('peer-failed');
@@ -349,7 +350,11 @@
       peerStatus.set(peerId, st);
       renderPeerList();
       if (st === 'failed' || st === 'disconnected') scheduleRetry(peerId, pc);
-      if (st === 'connected') { retryCount.delete(peerId); clearTimeout(retryTimers.get(peerId)); retryTimers.delete(peerId); detectRoute(peerId, pc); }
+      if (st === 'connected') {
+        retryCount.delete(peerId); clearTimeout(retryTimers.get(peerId)); retryTimers.delete(peerId);
+        window.voiceRelay?.setPeer(peerId, false); // da noi thang duoc, khong can di vong nua
+        detectRoute(peerId, pc);
+      }
     };
 
     // Loi moi/tra loi bi mat thi ket noi dung o "new" mai mai va khong bao gio bao 'failed',
@@ -415,13 +420,16 @@
   function scheduleRetry(peerId, pc) {
     if (retryTimers.has(peerId)) return;
     const tries = retryCount.get(peerId) || 0;
+    // Thu 2 lan khong duoc (~10 giay) thi bat duong thoai du phong ngay cho nguoi nay,
+    // dong thoi van tiep tuc thu noi thang o phia sau. Noi thang duoc thi tat duong vong.
+    if (tries >= 2) window.voiceRelay?.setPeer(peerId, true);
     if (tries >= 5) {
       peerStatus.set(peerId, 'gave-up');
       renderPeerList();
-      // Khong co TURN thi day gan nhu chac chan la do hai mang khong noi thang duoc voi nhau
+      // Khong noi thang duoc thi tieng da di vong qua server. Chi con thieu hinh.
       if (!relayAvailable) {
         const name = v.roster.find((p) => p.playerId === peerId)?.name || 'một người';
-        hint.textContent = `Không nối được với ${name}: hai máy đang ở hai mạng không nối thẳng được với nhau (hay gặp khi một bên dùng 4G). Chủ server cần bật máy chủ TURN, xem hướng dẫn trong README.`;
+        hint.textContent = `Không nối thẳng được với ${name} (hai mạng khác nhau), nên tiếng đang đi vòng qua server — vẫn nghe được nhau, chỉ không thấy camera. Muốn có cả camera thì chủ server bật TURN, xem README.`;
       }
       return;
     }
@@ -440,6 +448,7 @@
   }
 
   function destroyVoicePeer(peerId) {
+    window.voiceRelay?.setPeer(peerId, false);
     const pc = v.peers.get(peerId);
     if (pc) { pc.stopWatchdog?.(); try { pc.close(); } catch (e) {} v.peers.delete(peerId); }
     pc?.stopIndicator?.();
@@ -642,6 +651,7 @@
   renderPeerList();
   window.gameVoice = {
     mount, syncVoiceChannel, placeVideoGrid,
+    micStream: () => v.localStream,
     // Thong tin chan doan: dang co TURN khong, tung nguoi noi thang hay qua trung gian
     diagnostics: () => ({
       relayAvailable,

@@ -11,6 +11,8 @@ const { Chat } = require('./Chat');
 const { voiceChannelFor, voicePeersFor, canSignal, canHear } = require('./voice');
 const { createIceProvider } = require('./ice');
 const ice = createIceProvider();
+const { AudioRelay, validFramePacket } = require('./audio-relay');
+const relay = new AudioRelay();
 const { randomUUID } = require('crypto');
 const { TokenBucket, RoomCleanup, HostRecovery, validSocketData } = require('./Security');
 
@@ -88,6 +90,8 @@ io.on('connection', (socket) => {
   const controlLimit = new TokenBucket(60, 15);
   // ICE bursts grow with room size; do not let them consume gameplay capacity.
   const voiceLimit = new TokenBucket(600, 150);
+  // Tieng noi di vong: moi giay khoang 17 goi khi dang noi, cho thoai mai gap doi
+  const voiceFrameLimit = new TokenBucket(120, 40);
   const roomLimit = new TokenBucket(5, 0.5);
   socket.use((packet,next)=>{
     const [event, data, cb] = packet;
@@ -242,6 +246,36 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Bat/tat duong thoai du phong voi mot nguoi cu the (khi khong noi thang duoc voi ho)
+  socket.on('relay_set', ({ peerId, on, opus }, cb) => {
+    const game = rooms.get(socket.data.roomCode);
+    const me = game?.players.get(socket.data.playerId);
+    const peer = game?.players.get(peerId);
+    if (!me || me.socketId !== socket.id || !peer || peer.id === me.id) return cb?.({ ok: false });
+    if (on) relay.enable(game.roomCode, me.id, peer.id);
+    else relay.disable(game.roomCode, me.id, peer.id);
+    // Bao cho nguoi kia biet may nay co giai ma duoc Opus khong. May cu khong giai ma duoc
+    // thi nguoi kia phai gui bang mu-law, neu khong se noi ma ben kia khong nghe thay gi.
+    if (peer.connected) io.to(peer.socketId).emit('relay_peer', { peerId: me.id, on: !!on, opus: !!opus });
+    cb?.({ ok: true });
+  });
+
+  // Mot goi tieng noi. Server khong giai ma, chi kiem tra hinh dang roi chuyen tiep
+  // cho nhung nguoi VUA co duong vong voi nguoi gui, VUA duoc phep nghe ho theo luat choi.
+  socket.on('voice_frame', (buf) => {
+    if (!voiceFrameLimit.take()) return;
+    const game = rooms.get(socket.data.roomCode);
+    const me = game?.players.get(socket.data.playerId);
+    if (!me || !me.connected || me.socketId !== socket.id) return;
+    if (!validFramePacket(buf)) return;
+    for (const peerId of relay.partnersOf(game.roomCode, me.id)) {
+      const peer = game.players.get(peerId);
+      if (!peer?.connected) continue;
+      if (!canHear(game, peer, me)) continue; // luat choi: ban dem Dan lang khong nghe duoc Soi
+      io.to(peer.socketId).emit('voice_frame', { from: me.id, buf });
+    }
+  });
+
   socket.on('chat_send', (data, cb) => {
     const game = rooms.get(socket.data.roomCode);
     const player = game?.players.get(socket.data.playerId);
@@ -326,6 +360,7 @@ function handleLeave(socket, explicit=false) {
   const game = rooms.get(roomCode);
   if (!game) return;
   const player=game.getBySocket(socket.id);
+  if (player) relay.clearPlayer(roomCode, player.id);
   if(!explicit&&game.phase===PHASE.LOBBY&&player){
     player.connected=false;
     player.disconnectTimer=setTimeout(()=>{
@@ -342,6 +377,7 @@ function handleLeave(socket, explicit=false) {
   delete socket.data.playerId;
   if (game.players.size === 0) {
     if (game.timer) clearTimeout(game.timer);
+    relay.clearRoom(roomCode);
     rooms.delete(roomCode);
     cleanup.update(game);
     recovery.update(game);

@@ -136,12 +136,15 @@ masoi-online/
     Chat.js      -> Logic chat 3 kênh (chung / bầy Sói / Âm phủ), quyền đọc-gửi theo pha & tổ đội
     voice.js     -> Tính kênh voice chat (village/wolves/dead) cho từng người theo trạng thái game
     ice.js       -> Danh sách máy chủ STUN/TURN (Cloudflare, coturn hoặc tài khoản cố định)
+    audio-relay.js -> Đường thoại dự phòng: chuyển tiếp tiếng nói cho cặp không nối thẳng được
   public/
     index.html   -> Giao diện các màn hình (sảnh, lộ vai, trong game, kết thúc)
     style.css    -> Bao gồm theme sáng (ngày) / tối (đêm) tự chuyển theo pha
     app.js       -> Logic client chính, giao tiếp Socket.io, chuyển theme ngày/đêm
     chat.js      -> Giao diện chat 3 kênh
     voice.js     -> WebRTC mesh: kết nối trực tiếp giữa các trình duyệt, mic bật/tắt
+    voice-relay.js   -> Thoại dự phòng qua server khi không nối thẳng được (Opus/mu-law)
+    voice-worklet.js -> Thu và phát tiếng trên luồng riêng, kèm bộ đệm chống giật
     audio.js     -> Giọng dẫn chuyện (Text-to-Speech) + nhạc nền ngày/đêm, có bật/tắt
     sounds/      -> Nhạc WAV ngày/đêm, tổng hợp bằng scripts/generate-music.cjs
 ```
@@ -149,6 +152,7 @@ masoi-online/
 ## Giới hạn hiện tại / hướng mở rộng thêm
 
 - **Voice chat dùng WebRTC mesh (kết nối trực tiếp p2p)**: hoạt động tốt với vài người trong 1 kênh (ví dụ 2-4 Sói, hoặc vài người ở Âm phủ). Với kênh Làng đông người (10+ người cùng lúc), mỗi trình duyệt phải mở nhiều kết nối cùng lúc nên có thể hơi nặng máy/mạng yếu — cân nhắc vẫn dùng thêm Discord/Zoom ngoài nếu phòng đông và mạng không ổn định.
+- **Không cấu hình TURN thì vẫn nghe được tiếng, chỉ mất camera**: khi hai người không nối thẳng được, tiếng nói tự động đi vòng qua chính server này (`server/audio-relay.js` + `public/voice-relay.js`). Chỉ bật cho đúng cặp bị hỏng, chỉ gửi khi đang nói, mã hoá Opus 20ms (~23 kbps; máy cũ không có WebCodecs thì lui về mu-law ~64 kbps). Độ trễ cao hơn nối thẳng một chút, và **không có camera** — muốn camera thì phải bật TURN.
 - **WebRTC cần TURN để nối người ở mạng khác nhau**: chưa cấu hình TURN thì chỉ có STUN công cộng (Google, Cloudflare), đủ cho người cùng mạng hoặc mạng nhà dễ tính, nhưng người dùng 4G hoặc mạng công ty thường không nối được. Xem mục *Bật máy chủ TURN* ở trên.
 - **Giọng dẫn chuyện** phụ thuộc vào giọng đọc tiếng Việt có sẵn trên trình duyệt/thiết bị của từng người. Máy không có giọng tiếng Việt chỉ phát âm báo; giọng online vẫn phụ thuộc kết nối mạng.
 - Nhạc cần thao tác bấm của người dùng để trình duyệt cho phép phát. Giọng dẫn chuyện tiếng Việt phụ thuộc giọng đọc có sẵn trên thiết bị.

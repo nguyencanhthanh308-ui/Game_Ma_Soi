@@ -175,10 +175,14 @@
   <section id="room-voice" class="room-voice hidden" aria-label="Trò chuyện thoại trong phòng">
     <div class="voice-head">
       <h3>🎙️ Trò chuyện thoại</h3>
-      <button id="btn-toggle-mic" class="btn-primary small">🎤 Bật micro</button>
+      <div class="voice-head-buttons">
+        <button id="btn-toggle-mic" class="btn-primary small">🎤 Bật micro</button>
+        <button id="btn-toggle-cam" class="btn-secondary small">📷 Bật camera</button>
+      </div>
     </div>
     <p id="voice-channel-label" class="voice-channel-label">🔇 Không có kênh thoại lúc này</p>
     <p id="voice-hint" class="hint-text"></p>
+    <div id="video-grid" class="video-grid hidden" aria-label="Camera của mọi người"></div>
     <ul id="voice-peer-list" class="voice-peer-list"></ul>
   </section>
 

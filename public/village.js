@@ -235,6 +235,9 @@
     if(canvas.width!==size) {canvas.width=size;canvas.height=size;}
     ctx.imageSmoothingEnabled=false;
     if(artworkReady) {rect(ctx,'#14272b',0,0,size,size);ctx.drawImage(artwork,0,0,size,size);return;}
+    // Vai nay co anh rieng nhung chua tai xong: chi ve nen va cho. Neu ve hinh du phong
+    // o day thi nguoi choi se thay nhan vat cu hien ra roi bi anh that de len.
+    if(artwork) {rect(ctx,'#14272b',0,0,size,size);return;}
     if(wolf) {wolfPortrait(ctx,role.id);return;}
     rect(ctx,'#152a2c',0,0,96,96);
     for(let i=0;i<20;i++) rect(ctx,'#304843',random(i)*96,random(i+12)*96,2,2);
@@ -261,6 +264,11 @@
     currentRole=role;
     if(role) portrait(role);
   }
+  // Tai truoc anh cua moi vai ngay tu dau, de luc lo vai khong phai cho tai anh
+  function preloadArtwork() { artworkRoles.forEach(artworkFor); }
+  if(document.readyState==='complete') preloadArtwork();
+  else addEventListener('load',preloadArtwork,{once:true});
+
   window.villageArt={update(gs){game=gs;if(gs.phase==='LOBBY')currentRole=null;redraw();},role:setRole,refresh:()=>redraw()};
   document.addEventListener('visibilitychange',syncMotion);
   reducedMotion.addEventListener('change',syncMotion);

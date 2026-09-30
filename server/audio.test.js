@@ -53,7 +53,7 @@ test('phase changes discard stale delayed narration without cancelling another t
   h.phase('NIGHT_WOLVES');await h.tick(100);
   h.phase('DAY_VOTE','DAY_DISCUSSION');await h.tick(700);
   assert.equal(h.cancels,0);assert.equal(h.spoken.length,1);
-  assert.match(h.spoken[0].text,/bỏ phiếu/);
+  assert.match(h.spoken[0].text,/nêu tên/);
   const stale=h.spoken[0];
   h.phase('LOBBY','DAY_VOTE');stale.onend();await h.tick(30000);
   assert.equal(h.cancels,1);assert.equal(h.spoken.length,1);

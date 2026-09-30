@@ -15,7 +15,9 @@ const PHASE_LABEL = {
   DAY_ANNOUNCE: '☀️ Buổi sáng',
   HUNTER_SHOT: '🏹 Thợ săn bắn',
   DAY_DISCUSSION: '☀️ Thảo luận',
-  DAY_VOTE: '☀️ Bỏ phiếu',
+  DAY_VOTE: '☀️ Nêu tên',
+  DAY_DEFENSE: '⚖️ Biện hộ',
+  DAY_JUDGEMENT: '⚖️ Phán quyết',
   DAY_RESOLVE: '☀️ Kiểm phiếu',
   GAME_OVER: '🏁 Kết thúc',
 };
@@ -241,6 +243,14 @@ function renderRoleConfig() {
   $('btn-start').disabled = !ROLE_STEP_ORDER.length || sum !== total;
 }
 
+function kickPlayer(player) {
+  if (!confirm(`Mời ${player.name} rời phòng?`)) return;
+  socket.timeout(5000).emit('kick_player', { playerId: player.id }, (err, result) => {
+    if (err || !result?.ok) toast(result?.error || 'Chưa mời được người này rời phòng.');
+    else toast(`Đã mời ${player.name} rời phòng.`);
+  });
+}
+
 function renderLobby(gs) {
   renderSharedRoles(gs.roleConfig);
   $('room-code-display').textContent = gs.roomCode;
@@ -258,6 +268,14 @@ function renderLobby(gs) {
       badge.className = 'tag';
       badge.textContent = 'Chủ phòng';
       li.appendChild(badge);
+    }
+    if (state.isHost && p.id !== state.playerId) {
+      const kick = document.createElement('button');
+      kick.className = 'btn-secondary small kick-btn';
+      kick.textContent = '✕ Mời rời phòng';
+      kick.title = `Mời ${p.name} rời phòng`;
+      kick.addEventListener('click', () => kickPlayer(p));
+      li.appendChild(kick);
     }
     list.appendChild(li);
   });
@@ -348,15 +366,74 @@ startTimerLoop();
 function renderGamePlayerList(gs) {
   const list = $('game-player-list');
   list.innerHTML = '';
+  const votes = gs.dayVotes || {};
+  const byName = Object.fromEntries(gs.players.map((p) => [p.id, p.name]));
+  // Dem so phieu dang nham vao tung nguoi, de ai cung thay ngay ai dang bi nghi nhieu nhat
+  const tally = {};
+  for (const targetId of Object.values(votes)) if (targetId) tally[targetId] = (tally[targetId] || 0) + 1;
+  // Nguoi da mat duoc biet vai cua ca lang (server gui rieng qua private_state)
+  const revealed = Object.fromEntries((state.lastPrivate?.revealedRoles || []).map((r) => [r.id, r.roleName]));
+
   gs.players.forEach((p) => {
     const li = document.createElement('li');
     if (!p.alive) li.classList.add('dead');
     if (p.id === state.playerId) li.classList.add('me');
+    if (p.id === gs.accusedId) li.classList.add('accused');
+    const roleName = p.roleName || revealed[p.id];
     const label = document.createElement('span');
-    label.textContent = `${p.alive ? '💚' : '💀'} ${p.name}${p.alive && p.roleName ? ' (' + p.roleName + ')' : ''}`;
+    label.textContent = `${p.alive ? '💚' : '💀'} ${p.name}${roleName ? ' (' + roleName + ')' : ''}`;
     li.appendChild(label);
+
+    const marks = document.createElement('span');
+    marks.className = 'vote-marks';
+    let hasMarks = false;
+    if (tally[p.id]) {
+      const count = document.createElement('span');
+      count.className = 'vote-count';
+      count.textContent = `🗳 ${tally[p.id]}`;
+      marks.appendChild(count);
+      hasMarks = true;
+    }
+    if (votes[p.id] !== undefined && p.alive) {
+      const target = document.createElement('span');
+      target.className = 'vote-target';
+      target.textContent = votes[p.id] ? `→ ${byName[votes[p.id]] || '?'}` : '→ phiếu trắng';
+      marks.appendChild(target);
+      hasMarks = true;
+    }
+    if (hasMarks) li.appendChild(marks);
     list.appendChild(li);
   });
+}
+
+// Bang tom tat: con bao nhieu nguoi chua bo phieu, ai dang dan dau
+function renderVoteSummary(gs, area) {
+  const alive = gs.players.filter((p) => p.alive);
+  const votes = gs.dayVotes || {};
+  const voted = alive.filter((p) => votes[p.id] !== undefined).length;
+  const hint = document.createElement('p');
+  hint.className = 'hint-text';
+  hint.textContent = `${voted}/${alive.length} người đã nêu tên. Phiếu hiện trực tiếp ở danh sách người chơi. Bạn đổi phiếu được cho tới khi hết giờ.`;
+  area.appendChild(hint);
+}
+
+// Nut nem ca chua / tang hoa, dung chung cho pha bien ho va pha phan quyet
+function renderReactionButtons(gs, accusedName, area) {
+  const row = document.createElement('div');
+  row.className = 'reaction-row';
+  const counts = (gs.reactionCounts || {})[gs.accusedId] || { tomato: 0, flower: 0 };
+  [['tomato', '🍅 Ném cà chua'], ['flower', '💐 Tặng hoa']].forEach(([kind, text]) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-secondary reaction-btn';
+    btn.textContent = `${text}${counts[kind] ? ' · ' + counts[kind] : ''}`;
+    btn.addEventListener('click', () => sendReaction(kind, gs.accusedId));
+    row.appendChild(btn);
+  });
+  area.appendChild(row);
+  const hint = document.createElement('p');
+  hint.className = 'hint-text';
+  hint.textContent = `${accusedName} đang biện hộ: 🍅 ${counts.tomato || 0} · 💐 ${counts.flower || 0}`;
+  area.appendChild(hint);
 }
 
 function renderDeathsBanner(gs) {
@@ -407,15 +484,37 @@ function renderActionArea(gs, priv) {
     }
   }
 
-  if (!prompt || !prompt.action) return;
+  if (gs.phase === 'DAY_VOTE') renderVoteSummary(gs, area);
 
-  if (state.submittedForPhase === gs.actionVersion || state.pendingAction?.version === gs.actionVersion) {
+  if (!prompt || !prompt.action) {
+    // Nguoi bi neu ten va nguoi da mat khong bam gi duoc, nhung van cho xem so ca chua / hoa
+    if (gs.accusedId && (gs.phase === 'DAY_DEFENSE' || gs.phase === 'DAY_JUDGEMENT')) {
+      const accused = gs.players.find((p) => p.id === gs.accusedId);
+      if (accused) renderJudgeTally(gs, area);
+    }
+    return;
+  }
+
+  // Bo phieu va nem ca chua thi doi y duoc, nen khong khoa giao dien lai sau khi gui
+  const changeable = ['day_vote', 'judge_vote', 'react'].includes(prompt.action);
+  if (!changeable && (state.submittedForPhase === gs.actionVersion || state.pendingAction?.version === gs.actionVersion)) {
     const p = document.createElement('p');
     p.className = 'hint-text';
     p.textContent = state.submittedForPhase === gs.actionVersion
       ? 'Server đã nhận lựa chọn của bạn, đang chờ những người khác...'
       : 'Đang gửi, chờ server xác nhận…';
     area.appendChild(p);
+    return;
+  }
+
+  if (prompt.action === 'react') {
+    const accused = gs.players.find((p) => p.id === gs.accusedId);
+    renderReactionButtons(gs, accused?.name || '', area);
+    return;
+  }
+
+  if (prompt.action === 'judge_vote') {
+    renderJudgement(gs, prompt, area);
     return;
   }
 
@@ -499,12 +598,18 @@ function renderActionArea(gs, priv) {
       send('day_vote', { targetId: state.selected[0] || null });
     }
   });
+  if (prompt.action === 'day_vote') {
+    const mine = (gs.dayVotes || {})[state.playerId];
+    confirmBtn.textContent = mine !== undefined ? 'Đổi phiếu sang người đã chọn' : 'Nêu tên người đã chọn';
+  }
   area.appendChild(confirmBtn);
 
   if (prompt.action === 'whitewolf_kill' || prompt.action === 'day_vote' || prompt.action === 'guard_protect') {
     const skip = document.createElement('button');
     skip.className = 'btn-secondary';
-    skip.textContent = prompt.action === 'day_vote' ? 'Bỏ phiếu trắng' : 'Bỏ qua';
+    skip.textContent = prompt.action === 'day_vote'
+      ? ((gs.dayVotes || {})[state.playerId] ? 'Hủy phiếu (bỏ phiếu trắng)' : 'Bỏ phiếu trắng')
+      : 'Bỏ qua';
     skip.addEventListener('click', () => {
       if (prompt.action === 'whitewolf_kill') send('whitewolf_kill', { targetId: null });
       if (prompt.action === 'day_vote') send('day_vote', { targetId: null });
@@ -513,6 +618,74 @@ function renderActionArea(gs, priv) {
     area.appendChild(skip);
   }
 }
+
+// Dem phieu treo co / tha, ai cung xem duoc trong luc phan quyet
+function renderJudgeTally(gs, area) {
+  const judge = gs.judgeVotes || {};
+  const byName = Object.fromEntries(gs.players.map((p) => [p.id, p.name]));
+  const kill = Object.entries(judge).filter(([, v]) => v === 'kill');
+  const spare = Object.entries(judge).filter(([, v]) => v === 'spare');
+  const box = document.createElement('div');
+  box.className = 'judge-tally';
+  const line = (icon, label, list) => {
+    const row = document.createElement('p');
+    row.innerHTML = '';
+    row.textContent = `${icon} ${label}: ${list.length}${list.length ? ' — ' + list.map(([id]) => byName[id] || '?').join(', ') : ''}`;
+    box.appendChild(row);
+  };
+  line('⚰️', 'Treo cổ', kill);
+  line('🕊️', 'Tha', spare);
+  area.appendChild(box);
+  if (gs.phase === 'DAY_JUDGEMENT') {
+    const hint = document.createElement('p');
+    hint.className = 'hint-text';
+    hint.textContent = 'Hòa phiếu hoặc ít phiếu treo cổ hơn thì người bị nêu tên được tha.';
+    area.appendChild(hint);
+  }
+}
+
+function renderJudgement(gs, prompt, area) {
+  const mine = (gs.judgeVotes || {})[state.playerId];
+  const row = document.createElement('div');
+  row.className = 'action-buttons judge-buttons';
+  [['kill', '⚰️ Treo cổ'], ['spare', '🕊️ Tha']].forEach(([verdict, text]) => {
+    const btn = document.createElement('button');
+    btn.className = verdict === 'kill' ? 'btn-primary' : 'btn-secondary';
+    btn.classList.toggle('selected', mine === verdict);
+    btn.textContent = text + (mine === verdict ? ' ✓' : '');
+    btn.addEventListener('click', () => send('judge_vote', { verdict }));
+    row.appendChild(btn);
+  });
+  area.appendChild(row);
+  renderJudgeTally(gs, area);
+  renderReactionButtons(gs, prompt.accusedName || '', area);
+}
+
+// Nem ca chua / tang hoa: gui thang, khong di qua send() vi send() chan gui lien tiep
+function sendReaction(kind, targetId) {
+  if (!socket.connected || !targetId) return;
+  const version = state.lastGameState?.actionVersion;
+  if (version == null) return;
+  socket.emit('player_action', { type: 'react', payload: { kind, targetId }, actionVersion: version });
+}
+
+// Hieu ung bay ngang man hinh khi co nguoi nem ca chua hoac tang hoa
+socket.on('reaction', ({ kind, fromName }) => {
+  const el = document.createElement('div');
+  el.className = 'reaction-fly';
+  el.textContent = kind === 'tomato' ? '🍅' : '💐';
+  el.style.left = (10 + Math.random() * 70) + '%';
+  el.title = `${fromName} ${kind === 'tomato' ? 'ném cà chua' : 'tặng hoa'}`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1600);
+});
+
+socket.on('kicked', ({ reason }) => {
+  state.roomCode = null;
+  try { sessionStorage.removeItem('masoi_session'); } catch (e) { /* che do an danh */ }
+  toast(reason || 'Bạn đã bị mời rời phòng.');
+  setTimeout(() => location.reload(), 1500);
+});
 
 function send(type, payload) {
   if (!socket.connected) return toast('Đang mất kết nối. Hãy chờ kết nối lại rồi gửi.');

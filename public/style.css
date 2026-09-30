@@ -505,15 +505,20 @@ body { transition: background .6s ease, color .6s ease; }
    tin nhan, nen do la thanh cuon duy nhat va nam gon trong khung chat. */
 @media (min-width: 960px) {
   .room-side { max-height: calc(100svh - 48px); overflow: hidden; }
-  .room-side > .room-voice { flex: 0 0 auto; min-height: 0; overflow: visible; }
+  /* Binh thuong khung thoai giu dung chieu cao noi dung nen khong co thanh cuon rieng:
+     ca cot chi co dung mot thanh cuon la danh sach tin nhan.
+     Chi khi bat camera (luoi video lam no cao han len) thi moi cho no co lai va tu cuon. */
+  .room-side > .room-voice { flex: 0 0 auto; overflow: visible; }
+  .room-side > .room-voice.has-video { flex: 0 1 auto; min-height: 180px; overflow-y: auto; }
   .room-side > .room-chat { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
   /* Tieu de, nut kenh, khung soan tin giu nguyen chieu cao; chi danh sach tin nhan co lai */
   .room-side > .room-chat > * { flex-shrink: 0; }
-  .room-side > .room-chat .chat-messages { flex: 1 1 auto; height: clamp(200px, 50vh, 520px); min-height: 0; }
+  /* min-height de danh sach tin nhan khong bi ep xuong con vai chuc pixel */
+  .room-side > .room-chat .chat-messages { flex: 1 1 auto; height: clamp(200px, 50vh, 520px); min-height: 132px; }
 }
 
 /* Thu gon khung voice va phan dau khung chat de danh cho cho danh sach tin nhan */
-.voice-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.voice-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 12px; flex-wrap: wrap; }
 .voice-head h3 { margin: 0; }
 .voice-head button { width: auto; margin: 0; flex-shrink: 0; }
 .room-side .voice-channel-label { margin: 12px 0 2px; font-size: 13px; }
@@ -538,4 +543,51 @@ body { transition: background .6s ease, color .6s ease; }
 @media (max-width: 760px) {
   .audio-settings { order: 3; width: 100%; }
   .audio-settings button { flex: 1 1 auto; }
+}
+
+/* ==========================================================================
+   PHIEN TOA BAN NGAY: bang phieu, bien ho, phan quyet
+   ========================================================================== */
+.vote-marks { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.vote-count { font-weight: 700; color: var(--accent-2); font-size: .85rem; white-space: nowrap; }
+.vote-target { color: var(--text-dim); font-size: .78rem; white-space: nowrap; }
+.player-list li.accused { border-color: var(--wolf); box-shadow: 0 0 0 1px var(--wolf) inset; }
+
+.reaction-row, .judge-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 6px; }
+.reaction-row button, .judge-buttons button { flex: 1 1 auto; width: auto; margin: 0; }
+.reaction-btn { font-size: 1rem; }
+.judge-buttons button.selected { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.judge-tally { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--message-bg); }
+.judge-tally p { margin: 4px 0; font-size: .88rem; overflow-wrap: anywhere; }
+
+/* Ca chua / hoa bay ngang man hinh khi co nguoi nem */
+.reaction-fly {
+  position: fixed; bottom: 12%; font-size: 40px; pointer-events: none; z-index: 200;
+  animation: reaction-fly 1.6s ease-out forwards;
+}
+@keyframes reaction-fly {
+  0% { transform: translateY(0) rotate(0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(-46vh) rotate(38deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .reaction-fly { animation-duration: .6s; } }
+
+.kick-btn { width: auto; margin: 0 0 0 8px; padding: 4px 10px; min-height: 30px; font-size: 11px; flex-shrink: 0; }
+.player-list li { gap: 8px; }
+
+/* ---- Luoi camera ---- */
+/* Cot chat chi rong 340px, khong du cho tieu de + 2 nut tren cung mot hang */
+.voice-head-buttons { display: flex; gap: 8px; flex: 1 1 100%; min-width: 0; }
+.voice-head-buttons button { width: auto; margin: 0; flex: 1 1 auto; min-width: 0; padding: 8px 10px; white-space: nowrap; }
+.listen-btn { flex: 1 1 100%; width: auto; margin: 0; padding: 8px 10px; }
+/* Da thay mat kem ten roi thi khong can lap lai danh sach ten nua, danh cho cho khung chat */
+.room-voice.has-video .voice-peer-list { display: none; }
+.video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 12px 0 4px; max-height: 232px; overflow-y: auto; }
+.video-tile { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border: 1px solid var(--border); border-radius: 4px; background: #0b1417; }
+.video-tile.mine { border-color: var(--accent-2); }
+.video-tile video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
+.video-name {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 6px;
+  font-size: 10px; color: #f2eddc; background: #000000a8;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }

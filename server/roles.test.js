@@ -15,6 +15,15 @@ function setup(roles) {
   g.nightNumber = 1;
   return [g, [...g.players.values()]];
 }
+// Dua mot nguoi ra xet xu: neu ten -> bien ho -> ca lang bo phieu treo co.
+function execute(g, target, voterId = 'v') {
+  g.dayVotes = { [voterId]: target.id };
+  g._resolveDayVote(io, noop);
+  if (g.accusedId !== target.id) return false; // hoa phieu, khong ai bi dua ra xu
+  g.judgeVotes = { [voterId]: 'kill' };
+  g._resolveJudgement(io, noop);
+  return true;
+}
 function bite(g, p) { g.night = g._emptyNightActions(); g.night.wolfVictims = [p.id]; g.night.currentWolfVictim = p.id; g._resolveNight(io, noop); }
 
 test('wolf timeout always selects a living non-wolf, including protected players', () => {
@@ -134,11 +143,11 @@ test('poison bypasses passive bite resistance', () => {
 });
 test('prince survives first execution and is publicly revealed', () => {
   const [g,[p]]=setup(['prince','werewolf','villager','villager']);
-  g.dayVotes={v:p.id};g._resolveDayVote(io,noop);assert.ok(p.alive);assert.equal(g.publicPlayerList()[0].roleName,'Hoàng tử');
-  g.dayVotes={v:p.id};g._resolveDayVote(io,noop);assert.equal(p.alive,false);
+  assert.ok(execute(g,p));assert.ok(p.alive);assert.equal(g.publicPlayerList()[0].roleName,'Hoàng tử');
+  assert.ok(execute(g,p));assert.equal(p.alive,false);
 });
 test('tanner wins on execution but not on bite', () => {
-  const [g,[p]]=setup(['tanner','werewolf','villager']);g.dayVotes={v:p.id};g._resolveDayVote(io,noop);assert.equal(g.winner.winner,'tanner');
+  const [g,[p]]=setup(['tanner','werewolf','villager']);execute(g,p);assert.equal(g.winner.winner,'tanner');
   const [h,[q]]=setup(['tanner','werewolf','villager']);bite(h,q);assert.equal(h.winner,null);
 });
 test('lycan appears as wolf to seer', () => {

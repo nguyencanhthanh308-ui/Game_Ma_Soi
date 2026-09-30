@@ -94,6 +94,8 @@ function validActionPayload(type, payload) {
     case 'witch_action': return onlyKeys(payload, ['heal', 'poisonTargetId']) && (payload.heal === undefined || typeof payload.heal === 'boolean') && optionalTarget(payload.poisonTargetId);
     case 'guard_protect': case 'wolf_vote': case 'whitewolf_kill': case 'seer_check': case 'hunter_shoot': case 'day_vote':
       return onlyKeys(payload, ['targetId']) && optionalTarget(payload.targetId);
+    case 'judge_vote': return onlyKeys(payload, ['verdict']) && ['kill', 'spare'].includes(payload.verdict);
+    case 'react': return onlyKeys(payload, ['targetId', 'kind']) && string(payload.targetId) && ['tomato', 'flower'].includes(payload.kind);
     default: return false;
   }
 }
@@ -128,6 +130,8 @@ function validSocketData(event, data) {
     case 'voice_signal': return validVoiceSignal(data);
     case 'chat_audio': return Number.isSafeInteger(data) && data > 0;
     case 'chat_send': return object(data); // Chat.send validates content, size and channel permissions.
+    case 'kick_player': return object(data) && string(data.playerId);
+    case 'cam_state': return object(data) && typeof data.on === 'boolean' && onlyKeys(data, ['on']);
     case 'get_role_suggestion': case 'restart_to_lobby': case 'leave_room': return data == null;
     default: return false;
   }

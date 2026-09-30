@@ -23,6 +23,8 @@ const PHASE = {
   HUNTER_SHOT: 'HUNTER_SHOT',
   DAY_DISCUSSION: 'DAY_DISCUSSION',
   DAY_VOTE: 'DAY_VOTE',
+  DAY_DEFENSE: 'DAY_DEFENSE',
+  DAY_JUDGEMENT: 'DAY_JUDGEMENT',
   DAY_RESOLVE: 'DAY_RESOLVE',
   GAME_OVER: 'GAME_OVER',
 };
@@ -39,8 +41,17 @@ const DEFAULT_DURATIONS = {
   HUNTER_SHOT: 15,
   DAY_DISCUSSION: 90,
   DAY_VOTE: 30,
+  DAY_DEFENSE: 30,
+  DAY_JUDGEMENT: 20,
   DAY_RESOLVE: 5,
 };
+
+// Khi tat ca da bo phieu, khong chot ngay ma de lai ngan nay giay cho ai muon doi y.
+const CHANGE_VOTE_GRACE_MS = 5000;
+
+// Cac hanh dong duoc phep gui lai nhieu lan trong cung mot luot (doi phieu, nem ca chua/tang hoa).
+// Cac hanh dong con lai van chot mot lan de tranh doi y sau khi da biet ket qua.
+const CHANGEABLE_ACTIONS = new Set(['day_vote', 'judge_vote', 'react']);
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10);
@@ -67,6 +78,10 @@ class Game {
     this.lastProtectedId = null;
     this.dayVotes = {};
     this.skipDayVotes = new Set();
+    this.accusedId = null;   // nguoi bi nhieu phieu nhat, dang duoc bien ho
+    this.judgeVotes = {};    // voterId -> 'kill' | 'spare'
+    this.reactionCounts = {};// playerId -> { tomato, flower }
+    this.lastReactionAt = new Map();
     this.winner = null;
     this.actionVersion = 0;
     this.readyPlayers = new Set();
@@ -232,6 +247,9 @@ class Game {
   enterNight(io, broadcastFn) {
     this.skipDayVotes.clear();
     this.dayVotes = {};
+    this.judgeVotes = {};
+    this.accusedId = null;
+    this.reactionCounts = {};
     this.nightNumber += 1;
     this.night = this._emptyNightActions();
     this.night.remainingBites = this.doubleKillNextNight ? 2 : 1;
@@ -280,6 +298,16 @@ class Game {
     this.timer = setTimeout(() => this._advanceFromTimer(io, broadcastFn), duration * 1000);
   }
 
+  // Rut ngan pha dang chay xuong con ms mili giay (khong bao gio keo dai them).
+  _shortenPhase(io, broadcastFn, ms, onEnd) {
+    const endsAt = Date.now() + ms;
+    if (this.phaseEndsAt !== null && this.phaseEndsAt <= endsAt) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.phaseEndsAt = endsAt;
+    this.timer = setTimeout(onEnd, ms);
+    this.timer.unref?.();
+  }
+
   _advanceFromTimer(io, broadcastFn) {
     switch (this.phase) {
       case PHASE.NIGHT_CUPID:
@@ -303,6 +331,10 @@ class Game {
         return this._goToPhase(io, broadcastFn, PHASE.DAY_VOTE);
       case PHASE.DAY_VOTE:
         return this._resolveDayVote(io, broadcastFn);
+      case PHASE.DAY_DEFENSE:
+        return this._goToPhase(io, broadcastFn, PHASE.DAY_JUDGEMENT);
+      case PHASE.DAY_JUDGEMENT:
+        return this._resolveJudgement(io, broadcastFn);
       default:
         return;
     }
@@ -315,9 +347,14 @@ class Game {
     if (!player?.connected || !validActionPayload(type, payload)) return { ok: false, error: 'Hành động không hợp lệ.' };
     // A retry of an accepted request must never execute the action a second time.
     const payloadKey = JSON.stringify(payload);
-    if (player.lastAction?.version === actionVersion && player.lastAction.type === type) {
-      return player.lastAction.payloadKey === payloadKey ? { ok: true, actionVersion }
-        : { ok: false, error: 'Bạn đã xác nhận lựa chọn khác trong lượt này.' };
+    const repeat = player.lastAction?.version === actionVersion && player.lastAction.type === type;
+    // Gui lai y het = client thu lai goi tin cu, khong duoc chay hanh dong lan hai.
+    // Rieng 'react' thi lan gui thu hai la mot cu nem moi that su, da co do tre 700ms chan spam.
+    if (repeat && player.lastAction.payloadKey === payloadKey && type !== 'react') {
+      return { ok: true, actionVersion };
+    }
+    if (repeat && !CHANGEABLE_ACTIONS.has(type)) {
+      return { ok: false, error: 'Bạn đã xác nhận lựa chọn khác trong lượt này.' };
     }
     if (actionVersion !== this.actionVersion) return { ok: false, error: 'Lượt đã thay đổi. Hãy chọn lại ở lượt hiện tại.' };
     let changed = false;
@@ -458,9 +495,35 @@ class Game {
 
     if (this.phase === PHASE.DAY_VOTE && type === 'day_vote') {
       this.dayVotes[player.id] = payload.targetId || null; // null = bo phieu trang
-      const alive = this.alivePlayers();
-      const allVoted = alive.every((p) => this.dayVotes[p.id] !== undefined);
-      if (allVoted) this._resolveDayVote(io, broadcastFn);
+      // Du phieu roi thi khong chot ngay: de lai vai giay cho ai muon doi y.
+      if (this.alivePlayers().every((p) => this.dayVotes[p.id] !== undefined)) {
+        this._shortenPhase(io, broadcastFn, CHANGE_VOTE_GRACE_MS, () => this._resolveDayVote(io, broadcastFn));
+      }
+      broadcastFn(); // cap nhat bang phieu truc tiep cho ca phong
+      return true;
+    }
+
+    if (this.phase === PHASE.DAY_JUDGEMENT && type === 'judge_vote') {
+      if (player.id === this.accusedId) return; // nguoi bi xu khong duoc tu bo phieu
+      this.judgeVotes[player.id] = payload.verdict;
+      const voters = this.alivePlayers().filter((p) => p.id !== this.accusedId);
+      if (voters.every((p) => this.judgeVotes[p.id] !== undefined)) {
+        this._shortenPhase(io, broadcastFn, CHANGE_VOTE_GRACE_MS, () => this._resolveJudgement(io, broadcastFn));
+      }
+      broadcastFn();
+      return true;
+    }
+
+    if (type === 'react') {
+      if (this.phase !== PHASE.DAY_DEFENSE && this.phase !== PHASE.DAY_JUDGEMENT) return;
+      if (payload.targetId !== this.accusedId) return; // chi nem/tang cho nguoi dang bien ho
+      const now = Date.now();
+      if (now - (this.lastReactionAt.get(player.id) ?? -Infinity) < 700) return; // chong spam
+      this.lastReactionAt.set(player.id, now);
+      const counts = this.reactionCounts[payload.targetId] ||= { tomato: 0, flower: 0 };
+      counts[payload.kind] += 1;
+      io.to(this.roomCode).emit('reaction', { kind: payload.kind, targetId: payload.targetId, fromName: player.name });
+      broadcastFn();
       return true;
     }
   }
@@ -606,23 +669,60 @@ class Game {
 
   // ---------- Xu ly bo phieu ban ngay ----------
 
-  _resolveDayVote(io, broadcastFn) {
-    if (this.timer) clearTimeout(this.timer);
+  _tally(votes) {
     const tally = {};
-    for (const targetId of Object.values(this.dayVotes)) {
+    for (const targetId of Object.values(votes)) {
       if (!targetId) continue;
       tally[targetId] = (tally[targetId] || 0) + 1;
     }
-    const entries = Object.entries(tally);
-    let eliminatedId = null;
-    if (entries.length) {
-      const max = Math.max(...entries.map(([, v]) => v));
-      const top = entries.filter(([, v]) => v === max).map(([k]) => k);
-      if (top.length === 1) eliminatedId = top[0]; // hoa phieu -> khong ai bi treo co
-    }
-    this.lastVoteResult = { eliminatedId, tally };
-    this.dayVotes = {};
+    return tally;
+  }
 
+  // Nguoi bi nhieu phieu nhat. Hoa phieu -> khong ai bi dua ra bien ho.
+  _topVoted(tally) {
+    const entries = Object.entries(tally);
+    if (!entries.length) return null;
+    const max = Math.max(...entries.map(([, v]) => v));
+    const top = entries.filter(([, v]) => v === max).map(([k]) => k);
+    return top.length === 1 ? top[0] : null;
+  }
+
+  // Buoc 1: het gio neu ten. Ai bi nhieu phieu nhat thi duoc bien ho truoc khi lang phan quyet.
+  _resolveDayVote(io, broadcastFn) {
+    if (this.timer) clearTimeout(this.timer);
+    const tally = this._tally(this.dayVotes);
+    const accusedId = this._topVoted(tally);
+    this.lastVoteResult = { eliminatedId: null, tally, accusedId, judgement: null };
+
+    if (!accusedId) {
+      this.dayVotes = {};
+      return this._afterDayFlow(io, broadcastFn); // hoa phieu hoac khong ai bi neu ten
+    }
+    this.accusedId = accusedId;
+    this.judgeVotes = {};
+    this.reactionCounts = {};
+    this._goToPhase(io, broadcastFn, PHASE.DAY_DEFENSE);
+  }
+
+  // Buoc 3: dem phieu "treo co" / "tha". Hoa phieu hoac it phieu treo co hon -> duoc tha.
+  _resolveJudgement(io, broadcastFn) {
+    if (this.timer) clearTimeout(this.timer);
+    const accusedId = this.accusedId;
+    const votes = Object.values(this.judgeVotes);
+    const kill = votes.filter((v) => v === 'kill').length;
+    const spare = votes.filter((v) => v === 'spare').length;
+    const judgement = { kill, spare, votes: { ...this.judgeVotes } };
+    this.lastVoteResult = { ...(this.lastVoteResult || {}), accusedId, judgement, eliminatedId: null };
+    this.dayVotes = {};
+    this.judgeVotes = {};
+    this.accusedId = null;
+
+    if (kill <= spare) return this._afterDayFlow(io, broadcastFn); // duoc tha
+    this.lastVoteResult.eliminatedId = accusedId;
+    return this._eliminateByVote(io, broadcastFn, accusedId);
+  }
+
+  _eliminateByVote(io, broadcastFn, eliminatedId) {
     const eliminated = this.players.get(eliminatedId);
     if (eliminated?.role === 'tanner') {
       this._applyDeaths(io, [eliminatedId]);
@@ -631,6 +731,7 @@ class Game {
     if (eliminated?.role === 'prince' && !eliminated.revealedPrince) {
       eliminated.revealedPrince = true;
       this.lastVoteResult.eliminatedId = null;
+      this.lastVoteResult.princeSaved = true;
     } else if (eliminatedId) this._applyDeaths(io, [eliminatedId]);
 
     if (this.pendingHunterQueue.length) {
@@ -763,9 +864,39 @@ class Game {
       }
       case PHASE.DAY_VOTE:
         if (player.alive) {
-          return { action: 'day_vote', message: 'Bỏ phiếu cho người bạn nghi là Sói', targets: others(true).map((p) => ({ id: p.id, name: p.name })) };
+          return {
+            action: 'day_vote',
+            message: 'Nêu tên người bạn nghi là Sói. Bạn có thể đổi phiếu cho tới khi hết giờ.',
+            targets: others(true).map((p) => ({ id: p.id, name: p.name })),
+          };
         }
         return { action: null, message: 'Bạn đã mất, chỉ có thể quan sát' };
+      case PHASE.DAY_DEFENSE: {
+        const accused = this.players.get(this.accusedId);
+        if (!accused) return { action: null, message: null };
+        if (player.id === this.accusedId) {
+          return { action: null, message: 'Bạn bị nêu tên. Hãy biện hộ cho mình trước khi cả làng phán quyết.' };
+        }
+        return {
+          action: 'react',
+          message: `${accused.name} đang biện hộ. Hãy lắng nghe, ném cà chua hoặc tặng hoa.`,
+          targets: [{ id: accused.id, name: accused.name }],
+        };
+      }
+      case PHASE.DAY_JUDGEMENT: {
+        const accused = this.players.get(this.accusedId);
+        if (!accused) return { action: null, message: null };
+        if (player.id === this.accusedId) {
+          return { action: null, message: 'Cả làng đang phán quyết số phận của bạn.' };
+        }
+        if (!player.alive) return { action: null, message: `Cả làng đang phán quyết ${accused.name}.` };
+        return {
+          action: 'judge_vote',
+          message: `Treo cổ ${accused.name} hay tha? Bạn có thể đổi ý cho tới khi hết giờ.`,
+          accusedName: accused.name,
+          targets: [{ id: accused.id, name: accused.name }],
+        };
+      }
       default:
         return { action: null, message: null };
     }
@@ -782,10 +913,15 @@ class Game {
       nightNumber: this.nightNumber,
       dayNumber: this.dayNumber,
       skipDayVotes: this.phase === PHASE.DAY_DISCUSSION ? [...this.skipDayVotes] : [],
+      // Bang phieu cong khai: ai neu ten ai, cap nhat ngay khi co nguoi bo phieu.
+      dayVotes: this.phase === PHASE.DAY_VOTE ? { ...this.dayVotes } : undefined,
+      accusedId: this.phase === PHASE.DAY_DEFENSE || this.phase === PHASE.DAY_JUDGEMENT ? this.accusedId : undefined,
+      judgeVotes: this.phase === PHASE.DAY_JUDGEMENT ? { ...this.judgeVotes } : undefined,
+      reactionCounts: this.phase === PHASE.DAY_DEFENSE || this.phase === PHASE.DAY_JUDGEMENT ? this.reactionCounts : undefined,
       players: this.publicPlayerList(),
       hostId: this.hostId,
       lastDeaths: this.phase === PHASE.DAY_ANNOUNCE || this.phase === PHASE.DAY_DISCUSSION ? this._recentDeathsSummary() : undefined,
-      lastVoteResult: this.phase === PHASE.DAY_RESOLVE || this.phase === PHASE.NIGHT_GUARD ? this.lastVoteResult : undefined,
+      lastVoteResult: [PHASE.DAY_RESOLVE, PHASE.NIGHT_GUARD, PHASE.HUNTER_SHOT, PHASE.GAME_OVER].includes(this.phase) || this.phase.startsWith('NIGHT_') ? this.lastVoteResult : undefined,
       winner: this.winner,
       roleConfig: this.roleConfig,
     };
@@ -797,4 +933,4 @@ class Game {
   }
 }
 
-module.exports = { Game, PHASE, DEFAULT_DURATIONS };
+module.exports = { Game, PHASE, DEFAULT_DURATIONS, CHANGEABLE_ACTIONS };

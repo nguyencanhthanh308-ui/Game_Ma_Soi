@@ -21,7 +21,9 @@
     NIGHT_WITCH: 'Phù thủy hãy dậy. Hãy quyết định cứu người, sau đó chọn dùng thuốc độc.',
     HUNTER_SHOT: 'Thợ săn hãy chọn người để mang theo trước khi ra đi.',
     DAY_DISCUSSION: 'Cả làng cùng nhau thảo luận để tìm ra Sói.',
-    DAY_VOTE: 'Đã đến giờ bỏ phiếu. Hãy chọn người bạn nghi ngờ nhất.',
+    DAY_VOTE: 'Đã đến giờ nêu tên. Hãy chọn người bạn nghi ngờ nhất.',
+    DAY_DEFENSE: 'Người bị nêu tên hãy biện hộ cho mình.',
+    DAY_JUDGEMENT: 'Cả làng hãy phán quyết: treo cổ hay tha?',
   };
   // Loi cho vai vua xong luot nham mat lai, doc truoc khi goi vai tiep theo
   const CLOSE = {

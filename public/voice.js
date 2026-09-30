@@ -14,32 +14,45 @@
   const CHANNEL_LABEL = {
     village: '🏘️ Kênh: Làng (ai còn sống cũng nghe được)',
     wolves: '🐺 Kênh: Bầy Sói (riêng tư, chỉ Sói còn sống)',
-    dead: '👻 Kênh: Âm phủ (chỉ người đã mất)',
+    dead: '👻 Kênh: Âm phủ (bạn nghe được cả làng)',
   };
   const CHANNEL_HINT = {
     village: 'Mọi người còn sống đều nghe và nói được ở đây.',
     wolves: 'Chỉ bầy Sói còn sống nghe được nhau lúc này.',
-    dead: 'Chỉ những người đã mất mới vào được kênh này, có thể nói chuyện thoải mái.',
+    dead: 'Bạn đã mất: nói chuyện thoải mái trong Âm phủ, và vẫn nghe được người còn sống. Họ không nghe được bạn.',
     null: 'Hiện không có kênh thoại nào đang mở (đang là lượt riêng của một vai trò khác).',
   };
 
+  const camBtn = $('btn-toggle-cam');
+  const videoGrid = $('video-grid');
+
   const v = {
     micOn: false,
-    localStream: null,
+    camOn: false,
+    localStream: null,     // luong micro
+    camStream: null,       // luong camera
     peers: new Map(),      // playerId -> RTCPeerConnection
     audioEls: new Map(),   // playerId -> <audio>
+    videoEls: new Map(),   // playerId -> <video>
     channel: null,
     roster: [],
-    senders: new Map(),
+    senders: new Map(),      // playerId -> sender am thanh
+    videoSenders: new Map(), // playerId -> sender hinh anh
     ice: new Map(),
     chains: new Map(),
     busy: false,
     epoch: 0,
   };
+  // Huong ket noi cho tung kieu peer. Nguoi da mat chi nghe (recvonly), nguoi con song
+  // bi nguoi da mat nghe thi chi gui (sendonly).
+  const DIRECTION = { both: 'sendrecv', listen: 'recvonly', broadcast: 'sendonly' };
+  const modeOf = (peerId) => v.roster.find((p) => p.playerId === peerId)?.mode || 'both';
+  const sends = (peerId) => DIRECTION[modeOf(peerId)] !== 'recvonly';
   const listenBtn=document.createElement('button');
-  listenBtn.className='btn-secondary small';
+  listenBtn.className='btn-secondary small listen-btn';
   listenBtn.textContent='🔊 Nghe trò chuyện';
-  micBtn.after(listenBtn);
+  // Xuong hang rieng: de chung hang voi nut micro va camera thi ba nut bi gay chu
+  (camBtn.parentNode||micBtn).after(listenBtn);
   function playRemote(audio) {
     audio.play().catch(()=>{hint.textContent='Bấm Nghe trò chuyện để phát tiếng. Không cần bật mic.';});
   }
@@ -60,10 +73,62 @@
     }
   }
 
+  // ---------- Luoi camera ----------
+  function videoTile(id, label) {
+    let tile = document.getElementById('video-tile-' + id);
+    if (!tile) {
+      tile = document.createElement('div');
+      tile.className = 'video-tile';
+      tile.id = 'video-tile-' + id;
+      const el = document.createElement('video');
+      el.autoplay = true; el.playsInline = true; el.muted = true; // tieng di theo the <audio> rieng
+      const name = document.createElement('span');
+      name.className = 'video-name';
+      name.textContent = label;
+      tile.append(el, name);
+      videoGrid.appendChild(tile);
+    }
+    tile.querySelector('.video-name').textContent = label;
+    return tile.querySelector('video');
+  }
+  function syncGridVisibility() {
+    const hasVideo = videoGrid.childElementCount > 0;
+    videoGrid.classList.toggle('hidden', !hasVideo);
+    // Bao cho bo cuc biet khung thoai dang cao han binh thuong (xem style.css)
+    panel.classList.toggle('has-video', hasVideo);
+  }
+  function attachRemoteVideo(peerId, stream) {
+    const name = v.roster.find((p) => p.playerId === peerId)?.name || 'Người chơi';
+    const el = videoTile(peerId, name);
+    el.srcObject = stream;
+    el.play().catch(() => {});
+    v.videoEls.set(peerId, el);
+    syncGridVisibility();
+  }
+  function removeRemoteVideo(peerId) {
+    const el = v.videoEls.get(peerId);
+    if (el) el.srcObject = null;
+    v.videoEls.delete(peerId);
+    document.getElementById('video-tile-' + peerId)?.remove();
+    syncGridVisibility();
+  }
+  function syncLocalVideo() {
+    if (v.camStream) {
+      const el = videoTile('me', 'Bạn');
+      el.srcObject = v.camStream;
+      el.play().catch(() => {});
+      document.getElementById('video-tile-me')?.classList.add('mine');
+    } else {
+      document.getElementById('video-tile-me')?.remove();
+    }
+    syncGridVisibility();
+  }
+
   function updateLabels() {
     channelLabel.textContent = CHANNEL_LABEL[v.channel] || '🔇 Không có kênh thoại lúc này';
     hint.textContent = CHANNEL_HINT[v.channel] || CHANNEL_HINT.null;
     micBtn.disabled = !v.channel || v.busy;
+    camBtn.disabled = !v.channel || v.busy;
   }
 
   function renderPeerList() {
@@ -118,13 +183,21 @@
     const pc = new RTCPeerConnection(RTC_CONFIG);
     v.peers.set(peerId, pc);
 
-    // Only the offerer creates the audio section. The answerer reuses that section
-    // after setRemoteDescription, so both directions share the negotiated sender.
+    // Only the offerer creates the media sections. The answerer reuses them
+    // after setRemoteDescription, so both directions share the negotiated senders.
+    // Kenh video duoc mo san ngay tu dau (chua co track) de bat/tat camera sau nay
+    // chi can replaceTrack, khong phai thoa thuan lai ket noi.
     let trackReady=Promise.resolve();
     if(isInitiator){
-      const sender=pc.addTransceiver('audio',{direction:'sendrecv'}).sender;
-      v.senders.set(peerId,sender);
-      trackReady=sender.replaceTrack(v.localStream?.getAudioTracks()[0]||null);
+      const direction=DIRECTION[modeOf(peerId)];
+      const audioSender=pc.addTransceiver('audio',{direction}).sender;
+      const videoSender=pc.addTransceiver('video',{direction}).sender;
+      v.senders.set(peerId,audioSender);
+      v.videoSenders.set(peerId,videoSender);
+      trackReady=Promise.all([
+        audioSender.replaceTrack(sends(peerId)?v.localStream?.getAudioTracks()[0]||null:null),
+        videoSender.replaceTrack(sends(peerId)?v.camStream?.getVideoTracks()[0]||null:null),
+      ]);
     }
 
     pc.onicecandidate = (e) => {
@@ -133,6 +206,18 @@
 
     pc.ontrack = (e) => {
       if(v.peers.get(peerId)!==pc)return;
+      if(e.track.kind==='video'){
+        // Kenh video luon duoc mo san du chua ai bat camera, nen o day se co mot track "cam".
+        // Chi hien o hinh khi track thuc su co hinh, neu khong ai cung thay mot o den.
+        const stream=e.streams[0]||new MediaStream([e.track]);
+        const show=()=>attachRemoteVideo(peerId,stream);
+        const hide=()=>removeRemoteVideo(peerId);
+        e.track.addEventListener('unmute',show);
+        e.track.addEventListener('mute',hide);
+        e.track.addEventListener('ended',hide);
+        if(!e.track.muted) show();
+        return;
+      }
       let audioEl = v.audioEls.get(peerId);
       if (!audioEl) {
         audioEl = document.createElement('audio');
@@ -164,9 +249,10 @@
     const pc = v.peers.get(peerId);
     if (pc) { try { pc.close(); } catch (e) {} v.peers.delete(peerId); }
     pc?.stopIndicator?.();
-    v.senders.delete(peerId);v.ice.delete(peerId);v.chains.delete(peerId);
+    v.senders.delete(peerId);v.videoSenders.delete(peerId);v.ice.delete(peerId);v.chains.delete(peerId);
     const audioEl = v.audioEls.get(peerId);
     if (audioEl) { audioEl.srcObject = null; audioEl.remove(); v.audioEls.delete(peerId); }
+    removeRemoteVideo(peerId);
   }
 
   let sharedAudioContext=null;
@@ -197,7 +283,12 @@
 
   // Toggle only the audio source, preserving the already negotiated connections.
   async function refreshAllPeersWithCurrentStream() {
-    await Promise.all([...v.senders.values()].map(sender=>sender.replaceTrack(v.localStream?.getAudioTracks()[0]||null)));
+    const audio=v.localStream?.getAudioTracks()[0]||null;
+    const video=v.camStream?.getVideoTracks()[0]||null;
+    await Promise.all([
+      ...[...v.senders.entries()].map(([pid,sender])=>sender.replaceTrack(sends(pid)?audio:null)),
+      ...[...v.videoSenders.entries()].map(([pid,sender])=>sender.replaceTrack(sends(pid)?video:null)),
+    ]);
   }
 
   micBtn.addEventListener('click', async () => {
@@ -228,8 +319,47 @@
     finally {v.busy=false;micBtn.disabled=!v.channel;}
   });
 
+  camBtn.addEventListener('click', async () => {
+    if (v.busy || !v.channel) return;
+    v.busy = true; camBtn.disabled = true;
+    const epoch = v.epoch;
+    try {
+      if (!v.camOn) {
+        try {
+          v.camStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15 } },
+            audio: false,
+          });
+          if (epoch !== v.epoch || !v.channel) { v.camStream.getTracks().forEach(t => t.stop()); v.camStream = null; return; }
+        } catch (e) {
+          toast('Không thể mở camera: ' + (e.message || e.name));
+          return;
+        }
+        v.camOn = true;
+        camBtn.textContent = '🔴 Tắt camera';
+      } else {
+        v.camOn = false;
+        camBtn.textContent = '📷 Bật camera';
+        v.camStream?.getTracks().forEach(t => t.stop());
+        v.camStream = null;
+      }
+      syncLocalVideo();
+      await refreshAllPeersWithCurrentStream();
+      socket.emit('cam_state', { on: v.camOn });
+    } catch (e) { toast('Không thể cập nhật camera: ' + e.message); }
+    finally { v.busy = false; camBtn.disabled = !v.channel; }
+  });
+
+  socket.on('cam_state', ({ playerId, on }) => {
+    if (!on) removeRemoteVideo(playerId);
+    // Bat camera thi cho su kien 'unmute' cua track lo o hinh ra, vi luc do moi co khung hinh that
+  });
+
   socket.on('voice_signal', ({ fromPlayerId, fromSocketId, data }) => {
-    if(!data || data.channel!==v.channel || !v.roster.some(p=>p.playerId===fromPlayerId&&p.socketId===fromSocketId))return;
+    // Nguoi da mat nghe nguoi con song thi hai ben o hai kenh khac nhau, nen doi chieu
+    // voi kenh cua nguoi gui chu khong phai kenh cua minh.
+    const peer=v.roster.find(p=>p.playerId===fromPlayerId&&p.socketId===fromSocketId);
+    if(!data || !peer || data.channel!==peer.channel)return;
     const epoch=v.epoch;
     const job=(v.chains.get(fromPlayerId)||Promise.resolve()).then(async()=>{
     if(epoch!==v.epoch||!v.roster.some(p=>p.playerId===fromPlayerId&&p.socketId===fromSocketId))return;
@@ -238,11 +368,20 @@
       const pc = v.peers.get(fromPlayerId)||createVoicePeer(fromPlayerId, false);
       await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
       if(epoch!==v.epoch||v.peers.get(fromPlayerId)!==pc)return;
-      const transceiver=pc.getTransceivers().find(t=>t.receiver.track.kind==='audio');
-      if(!transceiver)return;
-      transceiver.direction='sendrecv';
-      v.senders.set(fromPlayerId,transceiver.sender);
-      await transceiver.sender.replaceTrack(v.localStream?.getAudioTracks()[0]||null);
+      // Huong phai khop voi quyen nghe cua minh: nguoi da mat chi nhan, khong gui gi sang.
+      const direction=DIRECTION[modeOf(fromPlayerId)];
+      const canSend=direction!=='recvonly';
+      const audioT=pc.getTransceivers().find(t=>t.receiver.track.kind==='audio');
+      const videoT=pc.getTransceivers().find(t=>t.receiver.track.kind==='video');
+      if(!audioT)return;
+      audioT.direction=direction;
+      v.senders.set(fromPlayerId,audioT.sender);
+      await audioT.sender.replaceTrack(canSend?v.localStream?.getAudioTracks()[0]||null:null);
+      if(videoT){
+        videoT.direction=direction;
+        v.videoSenders.set(fromPlayerId,videoT.sender);
+        await videoT.sender.replaceTrack(canSend?v.camStream?.getVideoTracks()[0]||null:null);
+      }
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       if(epoch!==v.epoch||v.peers.get(fromPlayerId)!==pc)return;
@@ -265,7 +404,10 @@
     v.epoch++;v.channel=null;v.roster=[];
     for (const pid of [...v.peers.keys()]) destroyVoicePeer(pid);
     v.localStream?.getTracks().forEach(t=>t.stop());v.localStream=null;v.micOn=false;
+    v.camStream?.getTracks().forEach(t=>t.stop());v.camStream=null;v.camOn=false;
+    syncLocalVideo();
     micBtn.textContent='🎤 Bật micro';micBtn.disabled=true;
+    camBtn.textContent='📷 Bật camera';camBtn.disabled=true;
     sharedAudioContext?.close().catch(()=>{});sharedAudioContext=null;
   });
 

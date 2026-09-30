@@ -5,10 +5,10 @@ const path = require('path');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { Game, PHASE } = require('./Game');
+const { Game, PHASE, CHANGEABLE_ACTIONS } = require('./Game');
 const { ROLE_INFO, isWolfTeam } = require('./roles');
 const { Chat } = require('./Chat');
-const { voiceChannelFor, voiceRoster } = require('./voice');
+const { voiceChannelFor, voicePeersFor, canSignal, canHear } = require('./voice');
 const { randomUUID } = require('crypto');
 const { TokenBucket, RoomCleanup, HostRecovery, validSocketData } = require('./Security');
 
@@ -41,13 +41,14 @@ function broadcastRoom(io, game) {
   recovery.update(game);
   const publicState = game.publicState();
   io.to(game.roomCode).emit('game_state', publicState);
-  const voiceGroups = voiceRoster(game);
 
   // Gui thong tin rieng tu (vai tro, goi y hanh dong) cho tung nguoi choi con ket noi
   for (const player of game.players.values()) {
     if (!player.connected) continue;
     const payload = { role: null, prompt: null, actionVersion: game.actionVersion,
-      submitted: player.lastAction?.version === game.actionVersion,
+      // Bo phieu va nem ca chua thi doi y duoc, nen khong danh dau la "da chot" -
+      // neu danh dau, giao dien se khoa lai va khong the doi phieu nua.
+      submitted: player.lastAction?.version === game.actionVersion && !CHANGEABLE_ACTIONS.has(player.lastAction.type),
       seerResults: player.role === 'seer' ? (player.seerResults || []) : [] };
     if (player.role) {
       const info = ROLE_INFO[player.role];
@@ -67,9 +68,15 @@ function broadcastRoom(io, game) {
     if (game.phase !== PHASE.LOBBY && game.phase !== PHASE.GAME_OVER) {
       payload.prompt = game.getPhasePrompt(player);
     }
-    const myVoiceChannel = voiceChannelFor(game, player);
-    payload.voiceChannel = myVoiceChannel;
-    payload.voicePeers = myVoiceChannel ? voiceGroups[myVoiceChannel].filter((p) => p.playerId !== player.id) : [];
+    // Nguoi da mat thi khong con gi de giau: cho ho xem vai cua ca lang de theo doi van dau.
+    if (!player.alive && game.phase !== PHASE.LOBBY) {
+      payload.revealedRoles = [...game.players.values()]
+        .filter((p) => p.role)
+        .map((p) => ({ id: p.id, role: p.role, roleName: ROLE_INFO[p.role].name, alive: p.alive }));
+    }
+    payload.voiceChannel = voiceChannelFor(game, player);
+    // Nguoi da mat van co peer de nghe du ho o kenh Am phu, nen danh sach nay tinh rieng
+    payload.voicePeers = voicePeersFor(game, player);
     io.to(player.socketId).emit('private_state', payload);
     io.to(player.socketId).emit('chat_state', game.chat.snapshot(game, player));
   }
@@ -199,14 +206,26 @@ io.on('connection', (socket) => {
     const me = game.players.get(socket.data.playerId);
     const target = game.players.get(toPlayerId);
     if (!me || !me.connected || me.socketId !== socket.id || !target || !target.connected) return;
-    // Chi cho relay neu ca 2 dang cung o mot kenh voice hop le (chong gia mao ket noi ngoai y muon)
-    const myChannel = voiceChannelFor(game, me);
-    const targetChannel = voiceChannelFor(game, target);
-    if (!myChannel || myChannel !== targetChannel) return;
+    // Chi relay khi it nhat mot chieu duoc phep nghe (chong gia mao ket noi ngoai y muon).
+    // Nguoi da mat nghe duoc nguoi con song nen hai ben o hai kenh khac nhau van hop le.
+    if (!canSignal(game, me, target)) return;
+    const myChannel = voiceChannelFor(game, me) || 'dead';
     if(data.channel!==undefined&&data.channel!==myChannel)return;
     if(data.toSocketId!==undefined&&data.toSocketId!==target.socketId)return;
     if(!['offer','answer','candidate'].includes(data.type))return;
     io.to(target.socketId).emit('voice_signal', { fromPlayerId: me.id, fromSocketId:socket.id, data });
+  });
+
+  // Bao cho nhung nguoi duoc phep thay minh biet camera vua bat hay tat.
+  // WebRTC khong bao dam bao su kien 'mute' khi ngung gui hinh, nen phai bao tay.
+  socket.on('cam_state', ({ on }) => {
+    const game = rooms.get(socket.data.roomCode);
+    const me = game?.players.get(socket.data.playerId);
+    if (!me || !me.connected || me.socketId !== socket.id) return;
+    for (const other of game.players.values()) {
+      if (!other.connected || other.id === me.id) continue;
+      if (canHear(game, other, me)) io.to(other.socketId).emit('cam_state', { playerId: me.id, on: !!on });
+    }
   });
 
   socket.on('chat_send', (data, cb) => {
@@ -222,6 +241,34 @@ io.on('connection', (socket) => {
       }
     }
     if (typeof cb === 'function') cb(result);
+  });
+
+  // Chu phong moi duoc duoi nguoi. Chi cho duoi luc o sanh cho hoac da ket thuc van:
+  // duoi giua van se lam lech so vai da chia va hong the can bang cua ca phong.
+  socket.on('kick_player', ({ playerId }, cb) => {
+    const game = rooms.get(socket.data.roomCode);
+    if (!game) return cb?.({ ok: false, error: 'Phòng không tồn tại.' });
+    const host = game.players.get(socket.data.playerId);
+    if (!host?.isHost) return cb?.({ ok: false, error: 'Chỉ chủ phòng mới được mời người khác rời phòng.' });
+    if (game.phase !== PHASE.LOBBY && game.phase !== PHASE.GAME_OVER) {
+      return cb?.({ ok: false, error: 'Chỉ mời rời phòng được lúc ở sảnh chờ hoặc sau khi ván kết thúc.' });
+    }
+    if (playerId === host.id) return cb?.({ ok: false, error: 'Bạn không thể tự mời mình rời phòng.' });
+    const target = game.players.get(playerId);
+    if (!target) return cb?.({ ok: false, error: 'Người chơi không còn trong phòng.' });
+
+    clearTimeout(target.disconnectTimer);
+    const targetSocket = io.sockets.sockets.get(target.socketId);
+    game.removePlayerBySocket(target.socketId);
+    game.readyPlayers.delete(playerId);
+    if (targetSocket) {
+      targetSocket.emit('kicked', { reason: 'Chủ phòng đã mời bạn rời phòng.' });
+      targetSocket.leave(game.roomCode);
+      delete targetSocket.data.roomCode;
+      delete targetSocket.data.playerId;
+    }
+    cb?.({ ok: true });
+    broadcastRoom(io, game);
   });
 
   socket.on('restart_to_lobby', (_, cb) => {

@@ -48,6 +48,9 @@ const DEFAULT_DURATIONS = {
 
 // Khi tat ca da bo phieu, khong chot ngay ma de lai ngan nay giay cho ai muon doi y.
 const CHANGE_VOTE_GRACE_MS = 5000;
+// Chia vai: nho 3 vai gan nhat cua moi nguoi, thu toi da 300 cach xao de tranh trung vai cu
+const ROLE_HISTORY_SIZE = 3;
+const DEAL_ATTEMPTS = 300;
 
 // Cac hanh dong duoc phep gui lai nhieu lan trong cung mot luot (doi phieu, nem ca chua/tang hoa).
 // Cac hanh dong con lai van chot mot lan de tranh doi y sau khi da biet ket qua.
@@ -201,15 +204,11 @@ class Game {
     this.roleConfig = roleConfig;
     if (durations) this.durations = { ...this.durations, ...durations };
 
-    const roleList = expandRoleConfig(roleConfig);
-    // Fisher-Yates shuffle
-    for (let i = roleList.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [roleList[i], roleList[j]] = [roleList[j], roleList[i]];
-    }
     const playerList = [...this.players.values()];
+    const roleList = this._dealRoles(expandRoleConfig(roleConfig), playerList);
     playerList.forEach((p, idx) => {
       p.role = roleList[idx];
+      p.roleHistory = [p.role, ...(p.roleHistory || [])].slice(0, ROLE_HISTORY_SIZE);
       p.alive = true;
       p.loverId = null;
       p.hasUsedWhiteKill = false;
@@ -220,6 +219,7 @@ class Game {
       p.doomedNight = null;
       p.revealedPrince = false;
       p.lastAction = null;
+      p.deathCause = null;
     });
 
     this.nightNumber = 0;
@@ -231,6 +231,32 @@ class Game {
     this.phaseEndsAt = null;
     this.actionVersion++;
     return { ok: true };
+  }
+
+  // Chia vai ngau nhien nhung tranh lap lai vai cu. Xao tron thuan tuy thi cong bang, nhung
+  // choi nhieu van trong cung phong rat hay gap lai dung vai van truoc. Vi vay xao nhieu lan
+  // va giu cach chia it trung vai gan day nhat; trung vai van truoc bi phat nang hon.
+  _dealRoles(roles, playerList) {
+    const shuffled = () => {
+      const list = [...roles];
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+      }
+      return list;
+    };
+    const penalty = (list) => playerList.reduce((sum, p, idx) => {
+      const history = p.roleHistory || [];
+      return sum + history.reduce((s, role, age) => s + (role === list[idx] ? ROLE_HISTORY_SIZE - age : 0), 0);
+    }, 0);
+    let best = shuffled();
+    let bestPenalty = penalty(best);
+    for (let attempt = 1; attempt < DEAL_ATTEMPTS && bestPenalty > 0; attempt++) {
+      const candidate = shuffled();
+      const candidatePenalty = penalty(candidate);
+      if (candidatePenalty < bestPenalty) { best = candidate; bestPenalty = candidatePenalty; }
+    }
+    return best;
   }
 
   startWhenReady(io, broadcastFn) {
@@ -592,9 +618,15 @@ class Game {
     if (this.timer) clearTimeout(this.timer);
     const deaths = new Set();
     const n = this.night;
+    // Ly do chet cua tung nguoi, chi nguoi da mat moi xem duoc. Mot nguoi co the chet vi nhieu ly do.
+    const causes = {};
+    const addCause = (id, text) => { (causes[id] = causes[id] || []).push(text); };
 
     for (const p of this.alivePlayers()) {
-      if (p.doomedNight && p.doomedNight <= this.nightNumber) deaths.add(p.id);
+      if (p.doomedNight && p.doomedNight <= this.nightNumber) {
+        deaths.add(p.id);
+        addCause(p.id, 'Không qua khỏi vết thương do Sói cắn đêm trước');
+      }
     }
     for (const victimId of n.wolfVictims) {
       const victim = this.players.get(victimId);
@@ -606,14 +638,17 @@ class Game {
         continue;
       }
       deaths.add(victimId);
+      addCause(victimId, 'Bị Sói cắn trong đêm');
     }
 
     if (n.whiteWolfTarget && n.whiteWolfTarget !== 'skip' && n.whiteWolfTarget !== n.guardTarget) {
       deaths.add(n.whiteWolfTarget);
+      addCause(n.whiteWolfTarget, 'Bị Sói trắng giết trong đêm');
     }
 
     if (n.witchPoisonTarget) {
       deaths.add(n.witchPoisonTarget); // thuoc doc khong the can duoc bao ve chan
+      addCause(n.witchPoisonTarget, 'Bị Phù thủy đầu độc');
     }
 
     this.lastProtectedId = n.guardTarget || null;
@@ -621,15 +656,18 @@ class Game {
     // Neu soi con chet dem nay -> dem sau soi duoc can 2 nguoi
 
 
-    this._applyDeaths(io, [...deaths]);
+    this._applyDeaths(io, [...deaths], causes);
 
     this.dayNumber += 1;
     this._goToPhase(io, broadcastFn, PHASE.DAY_ANNOUNCE);
   }
 
   // Ap dung tu vong: xu ly lan chuoi nguoi yeu (Cupid) va dua tho san vao hang doi
-  _applyDeaths(io, ids) {
+  // causes: id -> danh sach ly do (hoac mot chuoi). Nguoi chet theo nguoi yeu tu co ly do rieng.
+  _applyDeaths(io, ids, causes = {}) {
     const queue = [...ids];
+    const reasons = {};
+    for (const [id, c] of Object.entries(causes)) reasons[id] = [].concat(c).map((r, i) => (i ? r[0].toLowerCase() + r.slice(1) : r)).join(' và ');
     const processed = new Set();
     while (queue.length) {
       const id = queue.shift();
@@ -639,11 +677,15 @@ class Game {
       p.alive = false;
       if (p.role === 'wolfcub') this.doubleKillNextNight = true;
       processed.add(id);
+      p.deathCause = reasons[id] || 'Không rõ lý do';
       this.lastDeaths.push({ id: p.id, name: p.name, role: p.role });
 
       if (p.loverId) {
         const lover = this.players.get(p.loverId);
-        if (lover && lover.alive) queue.push(lover.id);
+        if (lover && lover.alive) {
+          queue.push(lover.id);
+          if (!reasons[lover.id]) reasons[lover.id] = 'Đau lòng chết theo người yêu ' + p.name;
+        }
       }
       if (p.role === 'hunter') {
         this.pendingHunterQueue.push(p.id);
@@ -674,7 +716,8 @@ class Game {
         finalTarget = candidates[Math.floor(Math.random() * candidates.length)].id;
       }
     }
-    if (finalTarget) this._applyDeaths(null, [finalTarget]);
+    const hunter = this.players.get(hunterId);
+    if (finalTarget) this._applyDeaths(null, [finalTarget], { [finalTarget]: 'Bị Thợ săn ' + (hunter?.name || '') + ' bắn trước khi chết' });
   }
 
   _continueAfterHunter(io, broadcastFn) {
@@ -747,14 +790,14 @@ class Game {
   _eliminateByVote(io, broadcastFn, eliminatedId) {
     const eliminated = this.players.get(eliminatedId);
     if (eliminated?.role === 'tanner') {
-      this._applyDeaths(io, [eliminatedId]);
+      this._applyDeaths(io, [eliminatedId], { [eliminatedId]: 'Bị dân làng bỏ phiếu treo cổ' });
       return this._endGame(io, broadcastFn, { winner: 'tanner', reason: eliminated.name + ' đã đạt mục tiêu bị treo cổ.' });
     }
     if (eliminated?.role === 'prince' && !eliminated.revealedPrince) {
       eliminated.revealedPrince = true;
       this.lastVoteResult.eliminatedId = null;
       this.lastVoteResult.princeSaved = true;
-    } else if (eliminatedId) this._applyDeaths(io, [eliminatedId]);
+    } else if (eliminatedId) this._applyDeaths(io, [eliminatedId], { [eliminatedId]: 'Bị dân làng bỏ phiếu treo cổ' });
 
     if (this.pendingHunterQueue.length) {
       this.afterHunterResume = 'DAY';
@@ -824,7 +867,7 @@ class Game {
     const alive = this.alivePlayers();
     const others = (excludeSelf) => alive.filter((p) => (excludeSelf ? p.id !== player.id : true));
 
-    if (!player.alive && !(this.phase === PHASE.HUNTER_SHOT && player.id === this.pendingHunterQueue[0])) return { action: null, message: 'Bạn đã mất, chỉ có thể quan sát.' };
+    if (!player.alive && !(this.phase === PHASE.HUNTER_SHOT && player.id === this.pendingHunterQueue[0])) return { action: null, message: 'Bạn đã mất' + (player.deathCause ? ' – ' + player.deathCause + '.' : '.') + ' Giờ bạn chỉ có thể quan sát.' };
     switch (this.phase) {
       case PHASE.NIGHT_CUPID:
         if (player.role === 'cupid') {

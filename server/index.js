@@ -15,6 +15,7 @@ const { AudioRelay, validFramePacket } = require('./audio-relay');
 const relay = new AudioRelay();
 const { randomUUID } = require('crypto');
 const { TokenBucket, RoomCleanup, HostRecovery, validSocketData } = require('./Security');
+const { speech, validText } = require('./tts');
 
 const app = express();
 const server = http.createServer(app);
@@ -24,6 +25,24 @@ const io = new Server(server, {
 });
 
 app.get('/api/roles', (_req, res) => res.json(ROLE_INFO));
+
+// Giong doc du phong cho trinh duyet khong co giong tieng Viet. Gioi han toc do theo IP
+// de server khong bi dung lam may doc mien phi.
+const ttsBuckets = new Map();
+app.get('/api/tts', async (req, res) => {
+  const text = req.query.text;
+  if (!validText(text)) return res.status(400).end();
+  const ip = req.ip || 'unknown';
+  if (!ttsBuckets.has(ip)) ttsBuckets.set(ip, new TokenBucket(30, 1));
+  if (!ttsBuckets.get(ip).take()) return res.status(429).end();
+  if (ttsBuckets.size > 1000) ttsBuckets.clear();
+  try {
+    const audio = await speech(text);
+    res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=86400' }).send(audio);
+  } catch (err) {
+    res.status(502).end();
+  }
+});
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -76,7 +95,8 @@ function broadcastRoom(io, game) {
     if (!player.alive && game.phase !== PHASE.LOBBY) {
       payload.revealedRoles = [...game.players.values()]
         .filter((p) => p.role)
-        .map((p) => ({ id: p.id, role: p.role, roleName: ROLE_INFO[p.role].name, alive: p.alive }));
+        .map((p) => ({ id: p.id, role: p.role, roleName: ROLE_INFO[p.role].name, alive: p.alive,
+          deathCause: p.alive ? undefined : p.deathCause }));
     }
     payload.voiceChannel = voiceChannelFor(game, player);
     // Nguoi da mat van co peer de nghe du ho o kenh Am phu, nen danh sach nay tinh rieng
@@ -330,6 +350,7 @@ io.on('connection', (socket) => {
       p.alive = true;
       p.loverId = null;
       p.lastAction = null;
+      p.deathCause = null;
     }
     game.phase = PHASE.LOBBY;
     for (const p of [...game.players.values()]) {

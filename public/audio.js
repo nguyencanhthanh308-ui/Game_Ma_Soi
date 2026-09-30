@@ -70,14 +70,18 @@
   }
   // Edge tra ve giong cuc bo (tieng Anh) truoc, giong online tieng Viet toi sau qua voiceschanged.
   // Vi vay phai cho toi khi thay giong tieng Viet (toi da 3 giay), khong chi cho danh sach khac rong.
+  // Da cho du mot lan ma khong co thi trinh duyet nay khong co giong tieng Viet (Coc Coc...):
+  // cac lan sau khong cho nua, de giong du phong doc ngay.
+  let voiceSearchDone = false;
   function waitForVietnameseVoice() {
     if (!synth) return Promise.resolve(null);
+    if (voiceSearchDone) { refreshVoices(); return Promise.resolve(vietnameseVoice()); }
     return new Promise((resolve) => {
       const started = Date.now();
       const poll = () => {
         refreshVoices();
         const voice = vietnameseVoice();
-        if (voice || Date.now() - started > 3000) resolve(voice);
+        if (voice || Date.now() - started > 3000) { voiceSearchDone = true; resolve(voice); }
         else setTimeout(poll, 150);
       };
       poll();
@@ -88,7 +92,54 @@
   function warnNoVoice() {
     if (noVoiceWarned) return;
     noVoiceWarned = true;
-    toast('Máy này chưa có giọng đọc tiếng Việt nên chỉ phát âm báo. Mở trò chơi bằng Microsoft Edge để nghe dẫn chuyện.');
+    toast('Không tải được giọng đọc tiếng Việt nên chỉ phát âm báo. Kiểm tra kết nối mạng, hoặc mở bằng Chrome/Edge để nghe dẫn chuyện.');
+  }
+
+  // ---------- Giong doc du phong qua server ----------
+  // Coc Coc, Firefox... khong co giong tieng Viet trong speechSynthesis. Khi do tai file mp3
+  // tu /api/tts. Server chi nhan cau ngan nen cat cau dai tai dau cau/dau phay.
+  let cloudAudio = null;
+  let cloudBroken = false;
+  function splitForCloud(text, max = 180) {
+    const parts = [];
+    let rest = text.trim();
+    while (rest.length > max) {
+      const head = rest.slice(0, max);
+      const cut = Math.max(head.lastIndexOf('. '), head.lastIndexOf(', '), head.lastIndexOf(' '));
+      const at = cut > 0 ? cut + 1 : max;
+      parts.push(rest.slice(0, at).trim());
+      rest = rest.slice(at).trim();
+    }
+    if (rest) parts.push(rest);
+    return parts;
+  }
+  function speakCloud(text) {
+    return new Promise((resolve) => {
+      const audio = new Audio('/api/tts?text=' + encodeURIComponent(text));
+      cloudAudio = audio;
+      let done = false;
+      const finish = (ok) => { if (done) return; done = true; if (cloudAudio === audio) cloudAudio = null; resolve(ok); };
+      audio.onended = () => finish(true);
+      audio.onerror = () => finish(false);
+      audio.onpause = () => finish(true);
+      // Bi chan tu phat (chua cham vao trang) khong phai loi server: bo qua cau nay thoi
+      audio.play().catch((err) => finish(err?.name === 'NotAllowedError'));
+    });
+  }
+  function stopCloud() {
+    const audio = cloudAudio;
+    cloudAudio = null;
+    audio?.pause();
+  }
+  async function playCloudLines(lines, delayMs, key, token) {
+    await sleep(Math.max(80, delayMs));
+    const parts = lines.flatMap((line) => splitForCloud(line));
+    for (let i = 0; i < parts.length; i++) {
+      if (token !== generation || !settings.narratorOn || document.hidden) return;
+      if (i === 0 && key) saveSetting('masoi_narrated', key);
+      const ok = await speakCloud(parts[i]);
+      if (!ok && i === 0) { cloudBroken = true; warnNoVoice(); return; }
+    }
   }
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -148,6 +199,7 @@
   }
   function stopSpeaking() {
     generation++;
+    stopCloud();
     const owned=!!current;
     finishQueue();
     if(owned)synth?.cancel();
@@ -174,8 +226,12 @@
       if (!lines.length) return sleep(wait);
       const voice = await waitForVietnameseVoice();
       if (!settings.narratorOn || document.hidden || token!==generation || key !== latestKey) return;
-      // Khong co giong tieng Viet thi giong tieng Anh se doc sai het, nen chi giu am bao.
-      if (!voice) { warnNoVoice(); return sleep(wait); }
+      // Khong co giong tieng Viet thi giong tieng Anh se doc sai het: doc bang giong tai tu
+      // server; neu ca server cung khong doc duoc thi chi giu am bao.
+      if (!voice) {
+        if (cloudBroken) { warnNoVoice(); return sleep(wait); }
+        return playCloudLines(lines, wait, key, token);
+      }
       await playLines(lines, voice, wait, key);
     };
     if (navigator.locks?.request) navigator.locks.request('masoi-narrator', run).catch(() => {});

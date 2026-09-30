@@ -373,6 +373,8 @@ function renderGamePlayerList(gs) {
   for (const targetId of Object.values(votes)) if (targetId) tally[targetId] = (tally[targetId] || 0) + 1;
   // Nguoi da mat duoc biet vai cua ca lang (server gui rieng qua private_state)
   const revealed = Object.fromEntries((state.lastPrivate?.revealedRoles || []).map((r) => [r.id, r.roleName]));
+  // ... va ca ly do tung nguoi da chet
+  const deathCauses = Object.fromEntries((state.lastPrivate?.revealedRoles || []).filter((r) => r.deathCause).map((r) => [r.id, r.deathCause]));
 
   gs.players.forEach((p) => {
     const li = document.createElement('li');
@@ -383,6 +385,12 @@ function renderGamePlayerList(gs) {
     const label = document.createElement('span');
     label.textContent = `${p.alive ? '💚' : '💀'} ${p.name}${roleName ? ' (' + roleName + ')' : ''}`;
     li.appendChild(label);
+    if (!p.alive && deathCauses[p.id]) {
+      const cause = document.createElement('small');
+      cause.className = 'death-cause';
+      cause.textContent = deathCauses[p.id];
+      li.appendChild(cause);
+    }
 
     const marks = document.createElement('span');
     marks.className = 'vote-marks';

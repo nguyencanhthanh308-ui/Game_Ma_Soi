@@ -529,6 +529,15 @@ body { transition: background .6s ease, color .6s ease; }
   .room-side .voice-peer-list { max-height: 72px; }
 }
 
+/* Man hinh thap (laptop 768px, trinh duyet co nhieu thanh cong cu, phong to trang...):
+   gioi han cot theo chieu cao khung nhin se ep danh sach tin nhan con vai chuc pixel va
+   cat mat o soan tin. Luc do bo gioi han, de cot cao theo noi dung va cuon cung trang. */
+@media (min-width: 960px) and (max-height: 820px) {
+  .room-side { position: static; max-height: none; overflow: visible; }
+  .room-side > .room-chat { flex: 0 0 auto; overflow: visible; }
+  .room-side > .room-chat .chat-messages { flex: 0 0 auto; height: 300px; }
+}
+
 /* Thu gon khung voice va phan dau khung chat de danh cho cho danh sach tin nhan */
 .voice-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 12px; flex-wrap: wrap; }
 .voice-head h3 { margin: 0; }
@@ -664,3 +673,8 @@ body { transition: background .6s ease, color .6s ease; }
 /* Nut micro dang bat: vien sang de biet minh dang mo tieng */
 .mic-live { box-shadow: 0 0 0 2px var(--wolf) inset; }
 .voice-peer-list li.peer-failed { opacity: .6; }
+
+/* Ly do chet (chi nguoi da mat moi thay): xuong dong rieng duoi ten. inline-block de khong
+   bi dinh gach ngang cua dong nguoi chet (text-decoration lan xuong ca the con block). */
+.player-list li { flex-wrap: wrap; }
+.player-list li .death-cause { flex-basis: 100%; font-size: .78rem; color: var(--text-dim); font-style: italic; display: inline-block; width: 100%; }

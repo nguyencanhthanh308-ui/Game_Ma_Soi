@@ -260,8 +260,29 @@ class Game {
   }
 
   // Luat chuan: Soi trang thuc day CACH MOT DEM, bat dau tu dem thu hai.
+  // Lich nay ai cung biet, nen bo qua dem le khong lo gi; con Soi trang da chet thi
+  // van phai goi dung lich de khong ai biet no da chet.
   _whiteWolfActsTonight() {
-    return this.nightNumber >= 2 && this.nightNumber % 2 === 0 && this._hasAlivePlayerWithRole('whitewolf');
+    return this.nightNumber >= 2 && this.nightNumber % 2 === 0 && this._roleInGame('whitewolf');
+  }
+
+  // Vai nay co nam trong bo vai cua van (bo vai cong khai cho ca phong) hay khong.
+  _roleInGame(roleId) {
+    if (this.roleConfig) return (this.roleConfig[roleId] || 0) > 0;
+    return [...this.players.values()].some((p) => p.role === roleId);
+  }
+
+  // Nguoi thuc hien luot dem nay con song khong. Cac pha khong phai luot cua mot vai thi coi nhu co.
+  _phaseActorAlive(phase) {
+    const actor = { NIGHT_CUPID: 'cupid', NIGHT_GUARD: 'guard', NIGHT_WHITEWOLF: 'whitewolf', NIGHT_SEER: 'seer', NIGHT_WITCH: 'witch' }[phase];
+    return !actor || this._hasAlivePlayerWithRole(actor);
+  }
+
+  // Luot gia khi nguoi giu vai da chet: 5-10 giay nhu mot nguoi that dang chon, khong dai hon luot that.
+  _fakeTurnSeconds(max) {
+    const low = Math.min(5, max);
+    const high = Math.min(10, max);
+    return low + Math.round(Math.random() * (high - low));
   }
 
   _hasAlivePlayerWithRole(roleId) {
@@ -271,29 +292,31 @@ class Game {
   _goToPhase(io, broadcastFn, phase) {
     if (this.timer) clearTimeout(this.timer);
 
-    // Tu dong bo qua cac pha khong co doi tuong tham gia
-    if (phase === PHASE.NIGHT_CUPID && (this.nightNumber !== 1 || !this._hasAlivePlayerWithRole('cupid'))) {
+    // Chi bo qua pha cua vai KHONG CO trong van. Bo vai duoc cong khai cho ca phong, nen
+    // bo qua mot vai CO trong van (vi nguoi giu vai da chet, hay Phu thuy da het thuoc)
+    // se lam lo ngay nguoi do da chet: dan chuyen khong goi toi vai do nua.
+    if (phase === PHASE.NIGHT_CUPID && (this.nightNumber !== 1 || !this._roleInGame('cupid'))) {
       return this._goToPhase(io, broadcastFn, PHASE.NIGHT_GUARD);
     }
-    if (phase === PHASE.NIGHT_GUARD && !this._hasAlivePlayerWithRole('guard')) {
+    if (phase === PHASE.NIGHT_GUARD && !this._roleInGame('guard')) {
       return this._goToPhase(io, broadcastFn, PHASE.NIGHT_WOLVES);
     }
     if (phase === PHASE.NIGHT_WHITEWOLF && !this._whiteWolfActsTonight()) {
       return this._goToPhase(io, broadcastFn, PHASE.NIGHT_SEER);
     }
-    if (phase === PHASE.NIGHT_SEER && !this._hasAlivePlayerWithRole('seer')) {
+    if (phase === PHASE.NIGHT_SEER && !this._roleInGame('seer')) {
       return this._goToPhase(io, broadcastFn, PHASE.NIGHT_WITCH);
     }
-    if (phase === PHASE.NIGHT_WITCH) {
-      const witch = this.alivePlayers().find((p) => p.role === 'witch');
-      if (!witch || (witch.hasUsedHeal && witch.hasUsedPoison)) {
-        return this._resolveNight(io, broadcastFn);
-      }
+    if (phase === PHASE.NIGHT_WITCH && !this._roleInGame('witch')) {
+      return this._resolveNight(io, broadcastFn);
     }
 
     this.phase = phase;
     this.actionVersion++;
-    const duration = this.durations[phase] || 15;
+    let duration = this.durations[phase] || 15;
+    // Vai co trong van nhung nguoi giu vai da chet: van goi vai (dan chuyen doc binh thuong)
+    // va cho mot khoang ngau nhien giong nhu co nguoi dang chon, roi moi sang luot sau.
+    if (!this._phaseActorAlive(phase)) duration = this._fakeTurnSeconds(duration);
     this.phaseEndsAt = Date.now() + duration * 1000;
     broadcastFn(io);
 

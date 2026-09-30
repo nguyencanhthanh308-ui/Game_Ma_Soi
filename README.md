@@ -104,6 +104,26 @@ Web này là 1 server Node.js thông thường (Express + Socket.io), có thể 
 ### Biến môi trường
 
 - `PORT`: cổng server lắng nghe (mặc định `3000`). Hầu hết các nền tảng (Railway, Render...) tự set biến này, không cần chỉnh gì thêm.
+- `CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN`: bật máy chủ TURN của Cloudflare cho voice/camera (xem mục dưới).
+- Hoặc `TURN_URLS` + `TURN_SECRET` (coturn tự cài, chế độ `use-auth-secret`), hoặc `TURN_URLS` + `TURN_USERNAME` + `TURN_CREDENTIAL` (TURN có tài khoản cố định). `TURN_URLS` cách nhau bằng dấu phẩy.
+
+### Bật máy chủ TURN (để người ở mạng khác nhau thấy/nghe được nhau)
+
+Voice và camera kết nối **thẳng giữa các máy**. Hai người cùng wifi hoặc cùng nhà mạng thường nối thẳng được, nhưng người ở mạng khác (hay gặp nhất: một bên dùng **4G**, vì nhà mạng cho nhiều thuê bao dùng chung một địa chỉ) thì **không nối thẳng được**, dù vẫn vào chung phòng và chat bình thường. Triệu chứng: *"hai người ở gần thì thấy nhau, người ở tỉnh khác thì không"*. Code **không** giới hạn theo mạng hay khu vực — đây là giới hạn của kết nối trực tiếp.
+
+Cách chữa là thêm một máy chủ **TURN** làm trung gian chuyển tiếp. Khuyên dùng **Cloudflare Realtime TURN** (miễn phí 1.000 GB/tháng, dư cho vài chục buổi chơi có camera):
+
+1. Tạo tài khoản miễn phí tại [dash.cloudflare.com](https://dash.cloudflare.com).
+2. Vào **Realtime** → **TURN Server** → **Create** để tạo một TURN key.
+3. Chép lại **Turn Token ID** và **API Token** (API Token chỉ hiện một lần).
+4. Trên nền tảng deploy (Railway/Render → Variables/Environment), thêm hai biến:
+   - `CF_TURN_KEY_ID` = Turn Token ID
+   - `CF_TURN_API_TOKEN` = API Token
+5. Deploy lại. Log server phải hiện `[ice] Đã bật máy chủ TURN (cloudflare).`
+
+Server tự xin tài khoản TURN tạm thời (hạn 24 giờ) và chỉ đưa cho người **đã vào phòng**. API Token không bao giờ bị gửi xuống trình duyệt.
+
+**Kiểm tra:** trong khung "Trò chuyện thoại", người đang nối qua TURN có chữ *"qua máy chủ trung gian"* cạnh tên. Người không nối được có chữ *"không kết nối được"*. Muốn xem chi tiết, mở Console của trình duyệt (F12) và gõ `gameVoice.diagnostics()`.
 
 ## Cấu trúc code
 
@@ -115,6 +135,7 @@ masoi-online/
     roles.js     -> Định nghĩa vai trò + công thức chia vai trò mặc định
     Chat.js      -> Logic chat 3 kênh (chung / bầy Sói / Âm phủ), quyền đọc-gửi theo pha & tổ đội
     voice.js     -> Tính kênh voice chat (village/wolves/dead) cho từng người theo trạng thái game
+    ice.js       -> Danh sách máy chủ STUN/TURN (Cloudflare, coturn hoặc tài khoản cố định)
   public/
     index.html   -> Giao diện các màn hình (sảnh, lộ vai, trong game, kết thúc)
     style.css    -> Bao gồm theme sáng (ngày) / tối (đêm) tự chuyển theo pha
@@ -128,7 +149,7 @@ masoi-online/
 ## Giới hạn hiện tại / hướng mở rộng thêm
 
 - **Voice chat dùng WebRTC mesh (kết nối trực tiếp p2p)**: hoạt động tốt với vài người trong 1 kênh (ví dụ 2-4 Sói, hoặc vài người ở Âm phủ). Với kênh Làng đông người (10+ người cùng lúc), mỗi trình duyệt phải mở nhiều kết nối cùng lúc nên có thể hơi nặng máy/mạng yếu — cân nhắc vẫn dùng thêm Discord/Zoom ngoài nếu phòng đông và mạng không ổn định.
-- **WebRTC cần STUN/TURN để xuyên NAT**: code đang dùng STUN công cộng miễn phí của Google, đủ dùng cho phần lớn mạng nhà/mạng di động thông thường. Nếu một số người không nghe được nhau (mạng công ty, mạng chặn UDP...), cần tự thêm TURN server riêng (ví dụ dịch vụ metered.ca) vào `RTC_CONFIG` trong `public/voice.js`.
+- **WebRTC cần TURN để nối người ở mạng khác nhau**: chưa cấu hình TURN thì chỉ có STUN công cộng (Google, Cloudflare), đủ cho người cùng mạng hoặc mạng nhà dễ tính, nhưng người dùng 4G hoặc mạng công ty thường không nối được. Xem mục *Bật máy chủ TURN* ở trên.
 - **Giọng dẫn chuyện** phụ thuộc vào giọng đọc tiếng Việt có sẵn trên trình duyệt/thiết bị của từng người. Máy không có giọng tiếng Việt chỉ phát âm báo; giọng online vẫn phụ thuộc kết nối mạng.
 - Nhạc cần thao tác bấm của người dùng để trình duyệt cho phép phát. Giọng dẫn chuyện tiếng Việt phụ thuộc giọng đọc có sẵn trên thiết bị.
 - Vai trò được lưu trong bộ nhớ server (không dùng database) — nếu server restart giữa ván, các phòng đang chơi sẽ mất. Phù hợp cho các buổi chơi ngắn vài giờ.

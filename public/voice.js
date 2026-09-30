@@ -21,6 +21,43 @@
     iceCandidatePoolSize: 4,
   };
   const RETRY_DELAY_MS = 2500;
+
+  // Server tra ve danh sach STUN + TURN (neu da cau hinh). Chua nhan duoc thi dung RTC_CONFIG.
+  // Thieu TURN thi nguoi o hai mang khac nhau (vd 4G va wifi, hai tinh khac nhau) thuong
+  // khong noi thang duoc voi nhau - xem server/ice.js.
+  let iceConfig = RTC_CONFIG;
+  let relayAvailable = false;
+  let iceSettled = false;
+  let icePromise = null;
+  let latestPriv = null;
+  function loadIceServers() {
+    if (icePromise) return icePromise;
+    icePromise = new Promise((resolve) => {
+      socket.timeout(5000).emit('get_ice_servers', null, (err, res) => {
+        if (!err && res?.ok && Array.isArray(res.iceServers) && res.iceServers.length) {
+          iceConfig = { iceServers: res.iceServers, iceCandidatePoolSize: 4 };
+          relayAvailable = !!res.relay;
+        }
+        iceSettled = true;
+        resolve();
+      });
+    });
+    return icePromise;
+  }
+  const peerRoute = new Map(); // playerId -> 'direct' | 'relay'
+  // Xem ket noi dang di thang giua hai may hay phai qua may chu trung gian (TURN)
+  function detectRoute(peerId, pc) {
+    pc.getStats?.().then((stats) => {
+      let pair = null;
+      stats.forEach((r) => { if (r.type === 'transport' && r.selectedCandidatePairId) pair = stats.get(r.selectedCandidatePairId); });
+      if (!pair) stats.forEach((r) => { if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') pair = r; });
+      if (!pair || v.peers.get(peerId) !== pc) return;
+      const local = stats.get(pair.localCandidateId);
+      const remote = stats.get(pair.remoteCandidateId);
+      peerRoute.set(peerId, local?.candidateType === 'relay' || remote?.candidateType === 'relay' ? 'relay' : 'direct');
+      renderPeerList();
+    }).catch(() => {});
+  }
   const CHANNEL_LABEL = {
     village: '🏘️ Kênh: Làng (ai còn sống cũng nghe được)',
     wolves: '🐺 Kênh: Bầy Sói (riêng tư, chỉ Sói còn sống)',
@@ -235,7 +272,8 @@
       // Bao ro khi khong noi duoc voi ai do, thay vi im lang de nguoi choi tu doan
       const label = st === 'gave-up' ? ' · không kết nối được'
         : st === 'failed' || st === 'disconnected' ? ' · đang kết nối lại…'
-        : st === 'connected' || st === undefined ? '' : ' · đang kết nối…';
+        : st === 'connected' ? (peerRoute.get(p.playerId) === 'relay' ? ' · qua máy chủ trung gian' : '')
+        : st === undefined ? '' : ' · đang kết nối…';
       name.textContent = p.name + label;
       if (st === 'gave-up') li.classList.add('peer-failed');
       li.append(dot, name);
@@ -246,6 +284,7 @@
   // Dong bo kenh + danh sach peer moi khi nhan private_state moi tu server (goi tu app.js)
   function syncVoiceChannel(priv) {
     if(!window.RTCPeerConnection){micBtn.disabled=true;camBtn.disabled=true;hint.textContent='Trình duyệt này không hỗ trợ trò chuyện thoại. Hãy dùng Chrome, Edge, Firefox hoặc Safari bản mới.';return;}
+    latestPriv=priv;
     const blocked=mediaUnavailableReason();
     if(blocked){micBtn.disabled=true;camBtn.disabled=true;hint.textContent=blocked;}
     const nextChannel=priv.voiceChannel||null;
@@ -266,6 +305,13 @@
     for (const pid of [...v.peers.keys()]) {
       if (!newIds.has(pid)) destroyVoicePeer(pid);
     }
+    // Danh sach nguoi trong kenh phai cap nhat NGAY (ca khi chua co cau hinh ICE), vi loi moi
+    // ket noi tu nguoi khac co the toi truoc; roster rong thi loi moi do bi bo va hai ben cho nhau mai.
+    // Chi viec tao ket noi moi la doi cau hinh STUN/TURN, de ngay tu dau da co duong qua TURN.
+    if (!iceSettled) {
+      loadIceServers().then(() => { if (latestPriv) syncVoiceChannel(latestPriv); });
+      return;
+    }
     v.roster.forEach((p) => {
       if (!v.peers.has(p.playerId)) {
         const iShouldInitiate = state.playerId < p.playerId;
@@ -275,7 +321,7 @@
   }
 
   function createVoicePeer(peerId, isInitiator) {
-    const pc = new RTCPeerConnection(RTC_CONFIG);
+    const pc = new RTCPeerConnection(iceConfig);
     v.peers.set(peerId, pc);
 
     // Only the offerer creates the media sections. The answerer reuses them
@@ -303,8 +349,16 @@
       peerStatus.set(peerId, st);
       renderPeerList();
       if (st === 'failed' || st === 'disconnected') scheduleRetry(peerId, pc);
-      if (st === 'connected') { retryCount.delete(peerId); clearTimeout(retryTimers.get(peerId)); retryTimers.delete(peerId); }
+      if (st === 'connected') { retryCount.delete(peerId); clearTimeout(retryTimers.get(peerId)); retryTimers.delete(peerId); detectRoute(peerId, pc); }
     };
+
+    // Loi moi/tra loi bi mat thi ket noi dung o "new" mai mai va khong bao gio bao 'failed',
+    // nen phai tu dat han: qua 12 giay chua noi duoc thi dung lai.
+    const connectWatchdog = setTimeout(() => {
+      if (v.peers.get(peerId) === pc && pc.connectionState !== 'connected') scheduleRetry(peerId, pc);
+    }, 12000);
+    connectWatchdog.unref?.();
+    pc.stopWatchdog = () => clearTimeout(connectWatchdog);
 
     pc.onicecandidate = (e) => {
       if (e.candidate && v.peers.get(peerId)===pc) socket.emit('voice_signal', { toPlayerId: peerId, data: { type: 'candidate', candidate: e.candidate, channel:v.channel, toSocketId:v.roster.find(p=>p.playerId===peerId)?.socketId } });
@@ -361,7 +415,16 @@
   function scheduleRetry(peerId, pc) {
     if (retryTimers.has(peerId)) return;
     const tries = retryCount.get(peerId) || 0;
-    if (tries >= 5) { peerStatus.set(peerId, 'gave-up'); renderPeerList(); return; }
+    if (tries >= 5) {
+      peerStatus.set(peerId, 'gave-up');
+      renderPeerList();
+      // Khong co TURN thi day gan nhu chac chan la do hai mang khong noi thang duoc voi nhau
+      if (!relayAvailable) {
+        const name = v.roster.find((p) => p.playerId === peerId)?.name || 'một người';
+        hint.textContent = `Không nối được với ${name}: hai máy đang ở hai mạng không nối thẳng được với nhau (hay gặp khi một bên dùng 4G). Chủ server cần bật máy chủ TURN, xem hướng dẫn trong README.`;
+      }
+      return;
+    }
     const epoch = v.epoch;
     const timer = setTimeout(() => {
       retryTimers.delete(peerId);
@@ -378,7 +441,7 @@
 
   function destroyVoicePeer(peerId) {
     const pc = v.peers.get(peerId);
-    if (pc) { try { pc.close(); } catch (e) {} v.peers.delete(peerId); }
+    if (pc) { pc.stopWatchdog?.(); try { pc.close(); } catch (e) {} v.peers.delete(peerId); }
     pc?.stopIndicator?.();
     v.senders.delete(peerId);v.videoSenders.delete(peerId);v.ice.delete(peerId);v.chains.delete(peerId);
     clearTimeout(retryTimers.get(peerId));retryTimers.delete(peerId);
@@ -460,7 +523,8 @@
       await refreshAllPeersWithCurrentStream();
       return true;
     } catch (e) { if (!quiet) toast('Không thể cập nhật micro: ' + e.message); return false; }
-    finally { v.busy = false; micBtn.disabled = !v.channel; }
+    // Mo khoa CA HAI nut: trong luc ban (v.busy) updateLabels da khoa ca nut camera
+    finally { v.busy = false; updateLabels(); }
   }
 
   micBtn.addEventListener('click', () => setMic(!v.micOn));
@@ -505,7 +569,7 @@
       await refreshAllPeersWithCurrentStream();
       socket.emit('cam_state', { on: v.camOn });
     } catch (e) { toast('Không thể cập nhật camera: ' + e.message); }
-    finally { v.busy = false; camBtn.disabled = !v.channel; }
+    finally { v.busy = false; updateLabels(); }
   });
 
   socket.on('cam_state', ({ playerId, on }) => {
@@ -519,10 +583,13 @@
     const peer=v.roster.find(p=>p.playerId===fromPlayerId&&p.socketId===fromSocketId);
     if(!data || !peer || data.channel!==peer.channel)return;
     const epoch=v.epoch;
-    const job=(v.chains.get(fromPlayerId)||Promise.resolve()).then(async()=>{
+    const job=(v.chains.get(fromPlayerId)||Promise.resolve()).then(()=>loadIceServers()).then(async()=>{
     if(epoch!==v.epoch||!v.roster.some(p=>p.playerId===fromPlayerId&&p.socketId===fromSocketId))return;
     if (data.type === 'offer') {
       if(state.playerId<fromPlayerId)return;
+      // Ben kia dung lai ket noi va moi lai: ket noi cu phia minh chua thong thi bo han di
+      const existing=v.peers.get(fromPlayerId);
+      if(existing&&existing.connectionState!=='connected'){destroyVoicePeer(fromPlayerId);}
       const pc = v.peers.get(fromPlayerId)||createVoicePeer(fromPlayerId, false);
       await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
       if(epoch!==v.epoch||v.peers.get(fromPlayerId)!==pc)return;
@@ -559,6 +626,7 @@
   });
 
   socket.on('disconnect', () => {
+    iceSettled=false;icePromise=null;peerRoute.clear();
     v.epoch++;v.channel=null;v.roster=[];
     for (const pid of [...v.peers.keys()]) destroyVoicePeer(pid);
     v.localStream?.getTracks().forEach(t=>t.stop());v.localStream=null;v.micOn=false;autoMicTried=false;
@@ -572,5 +640,13 @@
 
   updateLabels();
   renderPeerList();
-  window.gameVoice = { mount, syncVoiceChannel, placeVideoGrid };
+  window.gameVoice = {
+    mount, syncVoiceChannel, placeVideoGrid,
+    // Thong tin chan doan: dang co TURN khong, tung nguoi noi thang hay qua trung gian
+    diagnostics: () => ({
+      relayAvailable,
+      iceServers: iceConfig.iceServers.map((s) => [].concat(s.urls).join(' ')),
+      peers: v.roster.map((p) => ({ name: p.name, state: peerStatus.get(p.playerId) || 'new', route: peerRoute.get(p.playerId) || null })),
+    }),
+  };
 })();

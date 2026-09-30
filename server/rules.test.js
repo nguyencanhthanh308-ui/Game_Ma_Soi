@@ -46,11 +46,12 @@ test('Soi trang giet duoc nhieu lan chu khong chi mot lan ca van', (t) => {
   assert.equal(g.night.whiteWolfTarget, wolfB.id);
 });
 
-test('Soi trang chet roi thi khong con luot', (t) => {
+test('Soi trang chet roi van duoc goi dung lich (de khong lo no da chet), nhung khong ai hanh dong', (t) => {
   const [g, [ww]] = setup(['whitewolf', 'werewolf', 'villager', 'villager']);
   g.nightNumber = 2;
   ww.alive = false;
-  assert.equal(g._whiteWolfActsTonight(), false);
+  assert.equal(g._whiteWolfActsTonight(), true, 'dem chan van phai co luot Soi trang');
+  assert.equal(g._phaseActorAlive(PHASE.NIGHT_WHITEWOLF), false, 'nhung khong con ai de hanh dong');
 });
 
 // ---- Nguoi yeu khong duoc bo phieu chong lai nhau ----

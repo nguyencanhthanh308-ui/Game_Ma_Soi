@@ -9,6 +9,8 @@ const { Game, PHASE, CHANGEABLE_ACTIONS } = require('./Game');
 const { ROLE_INFO, isWolfTeam } = require('./roles');
 const { Chat } = require('./Chat');
 const { voiceChannelFor, voicePeersFor, canSignal, canHear } = require('./voice');
+const { createIceProvider } = require('./ice');
+const ice = createIceProvider();
 const { randomUUID } = require('crypto');
 const { TokenBucket, RoomCleanup, HostRecovery, validSocketData } = require('./Security');
 
@@ -147,6 +149,18 @@ io.on('connection', (socket) => {
     socket.data.playerId = player.id;
     cb && cb({ ok: true, roomCode: code, playerId: player.id, sessionToken: player.sessionToken });
     if (!game.startWhenReady(io, () => broadcastRoom(io, game))) broadcastRoom(io, game);
+  });
+
+  // May chu STUN/TURN cho WebRTC. Chi dua cho nguoi da vao phong: tai khoan TURN la tai
+  // nguyen co gioi han, khong phat cho bat ky ai go vao trang.
+  socket.on('get_ice_servers', async (_, cb) => {
+    if (typeof cb !== 'function') return;
+    if (!socket.data.roomCode) return cb({ ok: false, error: 'Bạn chưa vào phòng.' });
+    try {
+      cb({ ok: true, ...(await ice.getIceServers()) });
+    } catch (err) {
+      cb({ ok: false, error: 'Không lấy được cấu hình kết nối.' });
+    }
   });
 
   socket.on('get_role_suggestion', (_, cb) => {
@@ -339,4 +353,8 @@ function handleLeave(socket, explicit=false) {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Ma Sói Online server đang chạy tại http://localhost:${server.address().port}`);
+  const turn = ice.source();
+  console.log(turn === 'none'
+    ? '[ice] Chưa cấu hình TURN: người ở mạng khác nhau (vd 4G với wifi) có thể không thấy/nghe nhau. Xem README.'
+    : `[ice] Đã bật máy chủ TURN (${turn}).`);
 });

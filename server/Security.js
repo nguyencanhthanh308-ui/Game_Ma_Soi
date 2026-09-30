@@ -132,7 +132,7 @@ function validSocketData(event, data) {
     case 'chat_send': return object(data); // Chat.send validates content, size and channel permissions.
     case 'kick_player': return object(data) && string(data.playerId);
     case 'cam_state': return object(data) && typeof data.on === 'boolean' && onlyKeys(data, ['on']);
-    case 'get_role_suggestion': case 'restart_to_lobby': case 'leave_room': return data == null;
+    case 'get_role_suggestion': case 'restart_to_lobby': case 'leave_room': case 'get_ice_servers': return data == null;
     default: return false;
   }
 }

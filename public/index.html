@@ -39,8 +39,6 @@
       <div class="card entry-card">
         <p class="eyebrow">CUỘC CHƠI BẮT ĐẦU TỪ ĐÂY</p>
         <h2>Ghé vào làng.</h2>
-        <p class="subtitle">Chỉ cần một cái tên và những người bạn.<br>Không cần tài khoản.</p>
-
         <div class="tabs">
           <button class="tab-btn active" data-tab="create">Tạo phòng mới</button>
           <button class="tab-btn" data-tab="join">Tham gia phòng</button>
@@ -50,15 +48,15 @@
              doi tab khong lam the - va khung lang ben canh - thay doi chieu cao. -->
         <div class="tab-panes">
           <div id="tab-create" class="tab-content active">
-            <label for="create-name">Tên của bạn</label>
+            <label class="sr-only" for="create-name">Tên của bạn</label>
             <input id="create-name" type="text" placeholder="Tên của bạn (chủ phòng)" maxlength="20" />
             <button id="btn-create" class="btn-primary">Thắp lửa · Tạo phòng <span aria-hidden="true">↗</span></button>
           </div>
 
           <div id="tab-join" class="tab-content">
-            <label for="join-code">Mã phòng</label>
+            <label class="sr-only" for="join-code">Mã phòng</label>
             <input id="join-code" type="text" placeholder="Mã phòng (VD: A1B2C)" maxlength="6" style="text-transform:uppercase" />
-            <label for="join-name">Tên của bạn</label>
+            <label class="sr-only" for="join-name">Tên của bạn</label>
             <input id="join-name" type="text" placeholder="Tên của bạn" maxlength="20" />
             <button id="btn-join" class="btn-primary">Tham gia</button>
           </div>
@@ -67,7 +65,6 @@
         <p id="home-error" class="error-text" role="status"></p>
         <div class="entry-divider"><span>LẦN ĐẦU GHÉ LÀNG?</span></div>
         <details class="quick-guide"><summary>Cách chơi trong một phút <span aria-hidden="true">↗</span></summary><ol><li><strong>Nhận vai.</strong> Giữ bí mật lá bài và đọc năng lực của bạn.</li><li><strong>Đêm hành động.</strong> Sói đi săn, các vai thực hiện nhiệm vụ.</li><li><strong>Ngày suy luận.</strong> Thảo luận rồi bỏ phiếu tìm Sói.</li></ol><p>Chủ phòng chọn bộ vai trước khi chơi. Phòng 3–5 người phù hợp chơi thử.</p></details>
-        <p class="entry-footnote">Chơi ngay trên điện thoại hoặc máy tính.</p>
       </div>
     </section>
 

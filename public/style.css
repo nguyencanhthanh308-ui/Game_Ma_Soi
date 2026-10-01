@@ -209,16 +209,24 @@ body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opa
 .edition { color: var(--text-dim); font: 10px 'Courier New', monospace; letter-spacing: 2px; }
 .edition span { color: var(--accent-2); padding-left: 12px; }
 .screen { min-height: calc(100vh - 96px); min-height: calc(100svh - 96px); padding: 40px; position: relative; }
-/* Hai khoi cua trang mo dau - khung lang va the tham gia - nam chung HANG MOT va keo
-   bang nhau, nen day cua chung tao thanh mot duong thang. Hang so lieu xuong hang hai
-   duoi cot trai, doc nhu mot dong chu thich cho buc tranh. */
-/* align-content:center giu hai hang dung bang chieu cao noi dung roi can giua ca khoi.
+/* Trang mo dau chia ba hang: loi gioi thieu, khung lang, hang so lieu. The tham gia
+   nam o cot phai dung hang voi khung lang, nen hai khung cao bang nhau. Loi gioi thieu
+   va hang so lieu nho ra ngoai khoang do, o tren va duoi the. */
+/* align-content:center giu cac hang dung bang chieu cao noi dung roi can giua ca khoi.
    De mac dinh thi hang tu gian ra lap day chieu cao man hinh, lam vien dem trong khung
    lang phinh to theo cua so. */
-#screen-home.active { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); grid-template-rows: auto auto; column-gap: 64px; row-gap: 0; align-items: center; align-content: center; max-width: 1240px; margin: auto; padding-top: 44px; padding-bottom: 48px; }
+#screen-home.active { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); grid-template-rows: auto auto auto; column-gap: 64px; row-gap: 0; align-items: center; align-content: center; max-width: 1240px; margin: auto; padding-top: 44px; padding-bottom: 48px; }
 .home-world { min-width: 0; grid-column: 1; grid-row: 1; }
-#screen-home .world-facts { grid-column: 1; grid-row: 2; }
-#screen-home .entry-card { grid-column: 2; grid-row: 1; }
+#screen-home .home-village { grid-column: 1; grid-row: 2; }
+#screen-home .world-facts { grid-column: 1; grid-row: 3; }
+/* The tham gia nam chung hang voi khung lang va cung keo gian theo hang, nen hai khoi
+   luon cao bang nhau: day the trung day khung lang, dinh the trung dinh khung lang.
+   Hang nay cao theo khoi nao noi dung dai hon. */
+#screen-home .entry-card { grid-column: 2; grid-row: 2; }
+#screen-home .entry-card, #screen-home .home-village { align-self: stretch; }
+/* Tranh pixel giu nguyen ty le goc 480x280 va nam giua khung, phan du chia deu tren duoi
+   nhu vien lot cua mot buc tranh dong khung. Keo tranh cho vua khung se lam vo net pixel. */
+#screen-home .home-village { display: flex; flex-direction: column; justify-content: space-between; }
 .eyebrow { color: var(--accent-2); font: 10px/1.6 'Courier New', monospace; letter-spacing: 2px; margin: 0 0 18px; }
 .status-dot { display: inline-block; height: 6px; width: 6px; margin: 0 7px 1px 0; background: #96b895; box-shadow: 0 0 10px #96b89555; }
 .home-world h1 { font-size: clamp(44px, 4.7vw, 68px); font-weight: 400; line-height: 1.06; letter-spacing: -2px; margin: 0 0 20px; }
@@ -316,17 +324,6 @@ input::placeholder { color:#778e87; font-size:12px; }
 .role-card p { font-size:13px; }
 #screen-over .card { border-top:2px solid var(--accent-2); max-width:620px; }
 #screen-over h1 { color:var(--accent-2); font-size:30px; font-weight:400; }
-/* Canh day the tham gia bang day khung lang. Chi lam tu 1240px tro len, la khuon kho da
-   chot cua luoi: khi do the chi cao hon cot trai mot khoang co dinh nho, khung lang nuot
-   khoang do gon gang. Man hep hon thi chenh lech lon dan, vien dem se thanh mang trong
-   xau hon la de hai khoi can giua nhu cu. */
-@media (min-width:1240px) {
-  #screen-home.active { align-items: stretch; }
-  .home-world { display: flex; flex-direction: column; }
-  /* Tranh pixel giu nguyen ty le goc 480x280 va nam giua khung, phan du chia deu tren duoi
-     nhu vien lot cua mot buc tranh dong khung. Keo tranh cho vua khung se lam vo net pixel. */
-  #screen-home .home-village { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: space-between; }
-}
 @media (min-width:960px) { .room-chat { flex-basis:320px; top:24px; } }
 @media (max-width:1000px) {
   /* row-gap phai giu bang 0: hang so lieu da co padding-top rieng, them khe nua thi
@@ -339,13 +336,11 @@ input::placeholder { color:#778e87; font-size:12px; }
 @media (max-width:760px) {
   .site-header { min-height:78px; padding:18px 20px; } .brand { font-size:14px; } .brand-moon { font-size:34px; } .edition { font-size:8px; letter-spacing:1px; }
   #screen-home.active { display:flex; flex-direction:column; gap:30px; padding:30px 20px; }
-  /* Xep doc thi khong con hai cot de keo bang nhau. Hang so lieu dung ngay sau khung lang
-     nhu cu, con the tham gia xuong cuoi (trong DOM no dang nam truoc hang so lieu). */
-  #screen-home .world-facts { order:0; } #screen-home .entry-card { order:1; }
-  .home-world,.entry-card,.world-facts { width:100%; max-width:560px; } .home-world h1 { font-size:48px; }
+  /* Xep doc thi khong con hai cot de keo bang nhau; thu tu DOM da dung nen khong can order. */
+  .home-world,.home-village,.entry-card,.world-facts { width:100%; max-width:560px; } .home-world h1 { font-size:48px; }
   .world-intro { font-size:12px; } .desktop-break { display:none; }
   /* Xep doc thi khoang cach da do gap:30px cua cot lo, bo padding de khong cong don */
-  .home-village { margin-top:20px; } .world-facts { padding-top:0; }
+  .world-facts { padding-top:0; }
   .world-facts strong { font-size:20px; } .world-facts span { font-size:9px; }
   .world-facts>div { flex:1; flex-direction:column; align-items:flex-start; gap:5px; }
   .world-facts strong { white-space:nowrap; }

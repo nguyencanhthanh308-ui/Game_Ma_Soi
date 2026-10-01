@@ -46,18 +46,22 @@
           <button class="tab-btn" data-tab="join">Tham gia phòng</button>
         </div>
 
-        <div id="tab-create" class="tab-content active">
-          <label for="create-name">Tên của bạn</label>
-          <input id="create-name" type="text" placeholder="Tên của bạn (chủ phòng)" maxlength="20" />
-          <button id="btn-create" class="btn-primary">Thắp lửa · Tạo phòng <span aria-hidden="true">↗</span></button>
-        </div>
+        <!-- Hai the xep chong trong .tab-panes nen khoi nay luon cao bang the dai hon:
+             doi tab khong lam the - va khung lang ben canh - thay doi chieu cao. -->
+        <div class="tab-panes">
+          <div id="tab-create" class="tab-content active">
+            <label for="create-name">Tên của bạn</label>
+            <input id="create-name" type="text" placeholder="Tên của bạn (chủ phòng)" maxlength="20" />
+            <button id="btn-create" class="btn-primary">Thắp lửa · Tạo phòng <span aria-hidden="true">↗</span></button>
+          </div>
 
-        <div id="tab-join" class="tab-content">
-          <label for="join-code">Mã phòng</label>
-          <input id="join-code" type="text" placeholder="Mã phòng (VD: A1B2C)" maxlength="6" style="text-transform:uppercase" />
-          <label for="join-name">Tên của bạn</label>
-          <input id="join-name" type="text" placeholder="Tên của bạn" maxlength="20" />
-          <button id="btn-join" class="btn-primary">Tham gia</button>
+          <div id="tab-join" class="tab-content">
+            <label for="join-code">Mã phòng</label>
+            <input id="join-code" type="text" placeholder="Mã phòng (VD: A1B2C)" maxlength="6" style="text-transform:uppercase" />
+            <label for="join-name">Tên của bạn</label>
+            <input id="join-name" type="text" placeholder="Tên của bạn" maxlength="20" />
+            <button id="btn-join" class="btn-primary">Tham gia</button>
+          </div>
         </div>
 
         <p id="home-error" class="error-text" role="status"></p>

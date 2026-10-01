@@ -223,10 +223,6 @@ body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opa
    luon cao bang nhau: day the trung day khung lang, dinh the trung dinh khung lang.
    Hang nay cao theo khoi nao noi dung dai hon. */
 #screen-home .entry-card { grid-column: 2; grid-row: 2; }
-#screen-home .entry-card, #screen-home .home-village { align-self: stretch; }
-/* Tranh pixel giu nguyen ty le goc 480x280 va nam giua khung, phan du chia deu tren duoi
-   nhu vien lot cua mot buc tranh dong khung. Keo tranh cho vua khung se lam vo net pixel. */
-#screen-home .home-village { display: flex; flex-direction: column; justify-content: space-between; }
 .eyebrow { color: var(--accent-2); font: 10px/1.6 'Courier New', monospace; letter-spacing: 2px; margin: 0 0 18px; }
 .status-dot { display: inline-block; height: 6px; width: 6px; margin: 0 7px 1px 0; background: #96b895; box-shadow: 0 0 10px #96b89555; }
 .home-world h1 { font-size: clamp(44px, 4.7vw, 68px); font-weight: 400; line-height: 1.06; letter-spacing: -2px; margin: 0 0 20px; }
@@ -268,7 +264,11 @@ input::placeholder { color:#778e87; font-size:12px; }
    Khoang cach toi thieu voi o nhap do .entry-card .tab-content giu, de khi the khong con
    cho thua thi duong ke van khong dinh vao nut bam. */
 .entry-divider { border-top:1px solid var(--border); margin:auto 0 18px; text-align:center; }
-.entry-card .tab-content { margin-bottom:22px; }
+.entry-card .tab-panes { display:grid; margin-bottom:22px; }
+/* Hai the nam cung mot o luoi nen khoi luon cao bang the dai hon. visibility:hidden (chu
+   khong phai display:none) giu the an van chiem cho, dong thoi loai no khoi luong Tab. */
+.entry-card .tab-panes > .tab-content { grid-area:1/1; display:block; visibility:hidden; pointer-events:none; }
+.entry-card .tab-panes > .tab-content.active { visibility:visible; pointer-events:auto; }
 .entry-divider span { position:relative; top:-10px; background:#172729; padding:0 10px; font:9px 'Courier New',monospace; color:#8d9d94; letter-spacing:1px; }
 .quick-guide { font-size:12px; color:var(--text-dim); }
 .quick-guide summary { cursor:pointer; color:#dddbc7; list-style:none; min-height:36px; }
@@ -324,6 +324,17 @@ input::placeholder { color:#778e87; font-size:12px; }
 .role-card p { font-size:13px; }
 #screen-over .card { border-top:2px solid var(--accent-2); max-width:620px; }
 #screen-over h1 { color:var(--accent-2); font-size:30px; font-weight:400; }
+/* Chi khi con hai cot thi hai khoi moi keo bang nhau duoc. Chieu cao hang do the tham
+   gia quyet dinh, khung lang keo theo; tranh lang tu ve cao them cho kin khung (xem
+   fitCanvas trong village.js) nen khong con hai dai trong o tren va duoi. */
+@media (min-width:761px) {
+  #screen-home .entry-card, #screen-home .home-village { align-self: stretch; }
+  #screen-home .home-village { display: flex; flex-direction: column; }
+  /* flex-basis:0 de chieu cao tranh khong doi nguoc lai chieu cao khung: tranh chi an
+     phan con lai sau dong chu tren va duoi. */
+  #screen-home .home-village .village-canvas { flex: 1 1 0; min-height: 0; height: auto; }
+}
+
 @media (min-width:960px) { .room-chat { flex-basis:320px; top:24px; } }
 @media (max-width:1000px) {
   /* row-gap phai giu bang 0: hang so lieu da co padding-top rieng, them khe nua thi

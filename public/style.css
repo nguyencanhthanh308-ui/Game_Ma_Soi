@@ -231,6 +231,14 @@ body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opa
 .home-world h1 { font-size: clamp(44px, 4.7vw, 68px); font-weight: 400; line-height: 1.06; letter-spacing: -2px; margin: 0 0 20px; }
 .home-world h1 em { color: var(--accent-2); font-weight: 400; }
 .world-intro { color: var(--text-dim); font-size: 13px; line-height: 1.85; margin: 0 0 28px; }
+/* Nut xem doan gioi thieu. Dat o cot trai (hang mot cua luoi) nen khong anh huong toi
+   chieu cao the tham gia va khung lang o hang hai. */
+.watch-intro { display:inline-flex; align-items:center; gap:9px; min-height:44px;
+  padding:11px 20px; border:1px solid #3c5148; border-radius:3px; background:#213632;
+  color:#d5ddcf; font-size:12.5px; letter-spacing:.3px; text-decoration:none;
+  transition:background .15s, transform .15s; }
+.watch-intro:hover { background:#2c443d; transform:translateY(-1px); }
+.watch-intro span { color:var(--accent-2); font-size:10px; }
 .village-frame { position: relative; border: 1px solid #38504b; background: #102227; overflow: hidden; box-shadow: 0 14px 45px #0003; }
 .village-frame::after { content:''; pointer-events:none; position:absolute; inset:5px; border:1px solid #c9bb7f12; }
 .village-canvas { width:100%; height:auto; image-rendering: pixelated; display:block; }
@@ -480,6 +488,7 @@ body { transition: background .6s ease, color .6s ease; }
 }
 :root.theme-day .btn-primary:hover:not(:disabled) { background: #ecbd72; }
 :root.theme-day .btn-secondary { color: #3b3323; background: #e8dabb; border-color: #c6b183; }
+:root.theme-day .watch-intro { color: #3b3323; background: #e8dabb; border-color: #c6b183; }
 :root.theme-day .btn-secondary:hover:not(:disabled) { background: #dfcda6; }
 :root.theme-day .role-config-grid .stepper button { background: #e8dabb; border-color: #c6b183; }
 :root.theme-day input[type='text'] { background: var(--input-bg); border-color: #c6b183; color: var(--text); }

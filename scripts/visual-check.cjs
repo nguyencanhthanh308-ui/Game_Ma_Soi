@@ -58,6 +58,13 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
     let wolf;
     for(const p of pages)if(await p.evaluate("state.lastPrivate.role.id === 'werewolf'"))wolf=p;
     await wolf.evaluate("document.querySelector('.target-btn').click();document.querySelector('#action-area > .btn-primary').click()");await pause(200);
+    // Phong 3 nguoi mac dinh co ca Tien tri, nen dem chua het sau luot Soi. Di het cac
+    // luot con lai thay vi doi sang ngay ngay sau luot Soi.
+    for(let i=0;i<6&&String(await host.evaluate('state.lastGameState.phase')).startsWith('NIGHT_');i++){
+      for(const p of pages)if(await p.evaluate("!!document.querySelector('.target-btn')"))
+        await p.evaluate("document.querySelector('.target-btn').click();document.querySelector('#action-area > .btn-primary').click()");
+      await pause(250);
+    }
     assert.equal(await host.evaluate('state.lastGameState.phase'),'DAY_ANNOUNCE');
     await snapshot(host,'day',1366);
     const preview=await page();

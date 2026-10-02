@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trăng Khuyết · Intro</title>
+<style>
+  /* Trang nay chi de quay man hinh lam video intro, khong phai mot phan cua tro choi.
+     San khau co dinh 1280x720 roi phong to vua cua so: quay ra luon dung ty le 16:9. */
+  :root {
+    --bg: #0b1417; --card: #132124; --accent: #dcae69; --accent-2: #e4bc7c;
+    --text: #ece8d9; --text-dim: #a3b2ab; --border: #2b3d3d; --village: #4fb0a5;
+    --ghost: #8fb6c9; --wolf: #dcae69;
+    /* Georgia va Courier New thieu nhieu dau tieng Viet nen chu bi vo thanh font khac
+       giua cau. Cambria / Consolas / Segoe UI deu co san tren Windows va du bo dau. */
+    --serif: 'Cambria', 'Palatino Linotype', 'Times New Roman', serif;
+    --sans: 'Segoe UI', 'Be Vietnam Pro', 'Noto Sans', system-ui, sans-serif;
+    --mono: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #000; overflow: hidden; }
+  body { display: grid; place-items: center; font-family: var(--sans); }
+
+  #stage { position: relative; width: 1280px; height: 720px; flex: none;
+    background: var(--bg); overflow: hidden; transform-origin: center; }
+  /* Class compact-village de village.js noi rong canvas theo ty le khung (xem fitCanvas),
+     nho vay tranh phu kin 16:9 ma khong bi cat hai ben. */
+  .compact-village { position: absolute; inset: 0; }
+  .village-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+
+  #vignette { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, #0000 32%, #0b1417cc 100%); }
+  #dim { position: absolute; inset: 0; background: #000; opacity: 0;
+    transition: opacity 1s ease; pointer-events: none; }
+  #dim.on { opacity: .62; }
+  /* Luc chua phat chi lam toi bot, khong phu den kin: phu kin thi trang nhin nhu hong. */
+  #blackout { position: absolute; inset: 0; background: #000; pointer-events: none;
+    opacity: .7; transition: opacity 1.2s ease; }
+  #stage.playing #blackout { opacity: 0; }
+  #stage.ending #blackout { opacity: 1; transition: opacity 2.4s ease; }
+
+  /* Man cho: chi mot nut Phat intro o giua. Nhac va long tieng mac dinh bat san. */
+  #hint { position: absolute; inset: 0; z-index: 6; display: grid; place-content: center;
+    justify-items: center; gap: 22px; text-align: center; pointer-events: none;
+    transition: opacity .5s ease; }
+  #stage.started #hint { opacity: 0; }
+  #hint b { font: 400 58px/1.1 var(--serif); color: var(--text); letter-spacing: 1px;
+    text-shadow: 0 4px 30px #000; }
+  #btn-play { pointer-events: auto; padding: 17px 46px; font: 600 17px var(--sans);
+    letter-spacing: .5px; color: #172322; border: 0; cursor: pointer;
+    background: linear-gradient(110deg, #e6c58d, #cfa064); box-shadow: 0 4px 0 #7c603d;
+    transition: transform .15s ease, background .15s ease; }
+  #btn-play:hover:not(:disabled) { background: #efd4a3; transform: translateY(-2px); }
+  #btn-play:disabled { cursor: progress; background: #2a3b3a; color: #7f8f88;
+    box-shadow: 0 4px 0 #1b2928; }
+  #voice-note { font: 11px var(--mono); letter-spacing: 2px; color: #8fa89b; min-height: 15px; }
+  #voice-note.warn { color: #e0a06a; }
+
+  /* ---------- Cac lop chu ---------- */
+  .beat { position: absolute; left: 0; right: 0; text-align: center; opacity: 0;
+    transition: opacity .7s ease, transform .7s ease;
+    transform: translateY(14px); pointer-events: none; }
+  .beat.on { opacity: 1; transform: translateY(0); }
+
+  #eyebrow { top: 78px; font: 600 12px/1.6 var(--mono); letter-spacing: 4px;
+    color: var(--accent-2); text-transform: uppercase; text-shadow: 0 2px 12px #000; }
+  #headline { top: 230px; font: 400 74px/1.14 var(--serif); color: var(--text);
+    letter-spacing: -1px; text-shadow: 0 4px 34px #000d; }
+  #headline em { color: var(--accent-2); font-style: italic; }
+  #caption { bottom: 96px; font-size: 21px; line-height: 1.75; color: var(--text-dim);
+    text-shadow: 0 2px 18px #000; }
+  #caption strong { color: var(--text); font-weight: 600; }
+  #narration { top: 140px; font: 400 44px/1.35 var(--serif); color: var(--accent);
+    text-shadow: 0 2px 26px #000; }
+  #narration.typing::after { content: '▌'; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---------- Canh 3: the ghe vao lang ---------- */
+  #entry { position: absolute; top: 50%; left: 50%; width: 420px;
+    transform: translate(-50%, -46%) scale(.94); opacity: 0;
+    transition: opacity .7s ease, transform .7s ease;
+    background: linear-gradient(145deg, #1c2d2e, #142224); border: 1px solid #3b4b44;
+    border-top: 2px solid var(--accent); padding: 30px; box-shadow: 0 24px 60px #000a; }
+  #entry.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  #entry h3 { font: 400 34px/1.2 var(--serif); color: var(--text); margin-bottom: 20px; }
+  #entry .field { border: 1px solid #354642; background: #0d1c1f; color: #778e87;
+    padding: 13px 14px; font-size: 14px; margin-bottom: 14px; }
+  #entry .go { background: linear-gradient(110deg, #e6c58d, #cfa064); color: #172322;
+    text-align: center; padding: 14px; font-size: 15px; font-weight: 600;
+    box-shadow: 0 3px 0 #7c603d; }
+  #entry .note { margin-top: 18px; text-align: center; font: 11px var(--mono);
+    letter-spacing: 1px; color: #8d9d94; }
+
+  /* ---------- Canh 4: luoi 16 la bai ---------- */
+  #cards { position: absolute; inset: 0; display: grid; place-content: center;
+    grid-template-columns: repeat(8, 124px); gap: 16px 14px; opacity: 0;
+    transition: opacity .6s ease; pointer-events: none; }
+  #cards.on { opacity: 1; }
+  .role-card { position: relative; width: 124px; height: 148px; background: var(--card);
+    border: 2px solid var(--border); border-top: 2px solid var(--accent);
+    display: grid; place-items: start center; padding-top: 6px;
+    opacity: 0; transform: scale(.82); box-shadow: 0 10px 28px #0008; }
+  #cards.on .role-card { animation: pop .45s ease forwards; }
+  @keyframes pop { to { opacity: 1; transform: scale(1); } }
+  .role-card img { width: 104px; height: 104px; image-rendering: pixelated; }
+  .role-card span { position: absolute; bottom: 8px; font: 10px var(--mono);
+    color: var(--text-dim); letter-spacing: .3px; }
+
+  /* ---------- Canh 5: mat soi trong bong toi ---------- */
+  #eyes { position: absolute; top: 420px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 34px; opacity: 0; transition: opacity 1.4s ease; }
+  #eyes.on { opacity: 1; }
+  #eyes i { width: 26px; height: 14px; background: var(--wolf); display: block;
+    box-shadow: 0 0 26px 10px #dcae6955; animation: leer 3.4s ease-in-out infinite; }
+  @keyframes leer { 0%, 44%, 52%, 100% { transform: scaleY(1); } 48% { transform: scaleY(.12); } }
+
+  /* ---------- Canh 6: ba kenh tro chuyen rieng ---------- */
+  #channels { position: absolute; inset: 0; display: grid; align-content: center;
+    gap: 14px; padding: 0 180px; opacity: 0; transition: opacity .6s ease; }
+  #channels.on { opacity: 1; }
+  .chan { border: 1px solid var(--border); background: #0b1417d9; padding: 14px 18px;
+    display: flex; align-items: center; gap: 16px; opacity: 0; transform: translateX(-24px); }
+  #channels.on .chan { animation: slide-in .5s ease forwards; }
+  @keyframes slide-in { to { opacity: 1; transform: translateX(0); } }
+  .chan b { font: 600 14px var(--mono); letter-spacing: 2px; min-width: 160px; }
+  .chan .dots { display: flex; gap: 7px; }
+  .chan .dots i { width: 42px; height: 12px; display: block; opacity: .25;
+    animation: chat 1.8s ease-in-out infinite; }
+  .chan .dots i:nth-child(2) { width: 68px; animation-delay: .3s; }
+  .chan .dots i:nth-child(3) { width: 30px; animation-delay: .6s; }
+  @keyframes chat { 0%, 100% { opacity: .18; } 50% { opacity: .85; } }
+  .chan.village { border-left: 3px solid var(--village); }
+  .chan.village b { color: var(--village); } .chan.village .dots i { background: var(--village); }
+  .chan.wolf { border-left: 3px solid var(--wolf); }
+  .chan.wolf b { color: var(--wolf); } .chan.wolf .dots i { background: var(--wolf); }
+  .chan.dead { border-left: 3px solid var(--ghost); }
+  .chan.dead b { color: var(--ghost); } .chan.dead .dots i { background: var(--ghost); }
+
+  /* ---------- Canh 7: bong bong cai nhau + bang phieu ---------- */
+  .bubble { position: absolute; padding: 10px 14px; background: #0b1417ee;
+    border: 2px solid var(--accent); color: var(--text); font: 15px var(--mono);
+    white-space: nowrap; opacity: 0; transform: scale(.9) translateY(6px); }
+  .bubble.on { animation: bubble-in .35s ease forwards; }
+  .bubble.off { animation: bubble-out .35s ease forwards; }
+  .bubble.deny { border-color: var(--text-dim); color: var(--text-dim); }
+  .bubble.seer { border-color: var(--village); color: #bfe6e0; }
+  @keyframes bubble-in { to { opacity: 1; transform: scale(1) translateY(0); } }
+  @keyframes bubble-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-8px); } }
+
+  #tally { position: absolute; right: 64px; top: 50%; transform: translateY(-50%);
+    width: 230px; border: 1px solid var(--border); background: #0b1417e8; padding: 16px;
+    opacity: 0; transition: opacity .6s ease; }
+  #tally.on { opacity: 1; }
+  #tally h4 { font: 600 11px var(--mono); letter-spacing: 2px; color: var(--accent-2);
+    margin-bottom: 12px; }
+  #tally .row { display: flex; justify-content: space-between; align-items: center;
+    font-size: 14px; color: var(--text); padding: 7px 0; border-top: 1px solid #ffffff10; }
+  #tally .row em { font-style: normal; color: var(--accent); font-family: var(--mono); }
+
+  /* ---------- Canh 8: cac tinh nang di kem ---------- */
+  #feats { position: absolute; inset: 0; display: grid; place-content: center;
+    grid-template-columns: repeat(3, 330px); gap: 14px; opacity: 0;
+    transition: opacity .6s ease; }
+  #feats.on { opacity: 1; }
+  .feat { display: flex; align-items: center; gap: 13px; padding: 15px 16px;
+    background: #0b1417e6; border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    opacity: 0; transform: translateY(12px); }
+  #feats.on .feat { animation: rise .45s ease forwards; }
+  @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+  .feat b { font-size: 22px; line-height: 1; }
+  .feat span { font-size: 14px; line-height: 1.45; color: var(--text); }
+  .feat small { display: block; color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+
+  /* ---------- Canh 9: man chot ---------- */
+  #logo { position: absolute; inset: 0; display: grid; place-content: center;
+    justify-items: center; gap: 8px; opacity: 0; transition: opacity 1.2s ease; }
+  #logo.on { opacity: 1; }
+  #logo h1 { font: 400 86px/1 var(--serif); color: var(--text); letter-spacing: 7px; }
+  #logo p { font: 600 13px var(--mono); letter-spacing: 7px; color: var(--accent-2); }
+  #logo hr { width: 70px; border: 0; border-top: 1px solid var(--border); margin: 22px 0 6px; }
+  #logo small { font-size: 15px; color: var(--text-dim); letter-spacing: .5px; }
+  /* Nut nay bam duoc that: ai xem intro ngay tren web thi vao thang phong choi.
+     pointer-events chi mo khi nut da hien, de luc an no khong an mat cu bam. */
+  #cta { position: absolute; bottom: 88px; left: 0; right: 0; text-align: center;
+    opacity: 0; transition: opacity 1s ease; pointer-events: none; z-index: 5; }
+  #cta.on { opacity: 1; pointer-events: auto; }
+  #cta a { display: inline-block; padding: 15px 34px; font-size: 16px; font-weight: 600;
+    color: #172322; background: linear-gradient(110deg, #e6c58d, #cfa064);
+    box-shadow: 0 3px 0 #7c603d; letter-spacing: .5px; text-decoration: none;
+    transition: transform .15s ease, background .15s ease; }
+  #cta a:hover { background: #efd4a3; transform: translateY(-2px); }
+  #cta a span { float: right; margin-left: 14px; }
+  #cta .url { display: block; margin-top: 18px; font: 13px var(--mono);
+    letter-spacing: 1.5px; color: var(--accent-2); text-decoration: none; }
+  #cta .url:hover { color: var(--text); }
+  #cta em { display: block; margin-top: 12px; font: 11px var(--mono); font-style: normal;
+    letter-spacing: 3px; color: var(--text-dim); }
+
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div class="compact-village">
+      <canvas class="village-canvas" width="1280" height="280"
+        role="img" aria-label="Ngôi làng pixel Trăng Khuyết"></canvas>
+    </div>
+    <div id="vignette"></div>
+    <div id="dim"></div>
+    <!-- Man den nam DUOI cac lop chu: het intro, canh lang toi di nhung logo va nut
+         vao choi van sang tren nen den va van bam duoc. -->
+    <div id="blackout"></div>
+    <div id="hint">
+      <b>Trăng Khuyết</b>
+      <button id="btn-play" disabled>Đang tải giọng…</button>
+      <span id="voice-note"></span>
+    </div>
+
+    <div id="entry">
+      <h3>Ghé vào làng.</h3>
+      <div class="field">Tên của bạn…</div>
+      <div class="field">Mã phòng (VD: A1B2C)</div>
+      <div class="go">Thắp lửa · Tạo phòng</div>
+      <div class="note">KHÔNG CẦN TÀI KHOẢN</div>
+    </div>
+
+    <div id="cards"></div>
+    <div id="eyes"><i></i><i></i></div>
+
+    <div id="channels">
+      <div class="chan village"><b>🏘️ LÀNG</b><span class="dots"><i></i><i></i><i></i></span></div>
+      <div class="chan wolf"><b>🐺 BẦY SÓI</b><span class="dots"><i></i><i></i><i></i></span></div>
+      <div class="chan dead"><b>👻 ÂM PHỦ</b><span class="dots"><i></i><i></i><i></i></span></div>
+    </div>
+
+    <div id="tally">
+      <h4>KẾT QUẢ BỎ PHIẾU</h4>
+      <div class="row"><span>Minh</span><em>●●●</em></div>
+      <div class="row"><span>Nguyệt</span><em>●●</em></div>
+      <div class="row"><span>Phước</span><em>●</em></div>
+    </div>
+
+    <div id="feats"></div>
+
+    <p id="eyebrow" class="beat"></p>
+    <h2 id="headline" class="beat"></h2>
+    <p id="narration" class="beat"></p>
+    <p id="caption" class="beat"></p>
+
+    <div id="logo">
+      <h1>TRĂNG KHUYẾT</h1>
+      <p>MA SÓI ONLINE</p>
+      <hr />
+      <small>3–20 người · 16 vai trò · không cần tài khoản</small>
+    </div>
+    <div id="cta">
+      <a href="https://game-ma-soi-1.onrender.com" target="_blank" rel="noopener">
+        Thắp lửa · Vào chơi ngay <span aria-hidden="true">↗</span>
+      </a>
+      <a class="url" href="https://game-ma-soi-1.onrender.com" target="_blank" rel="noopener">game-ma-soi-1.onrender.com</a>
+      <em>CHƠI NGAY TRÊN ĐIỆN THOẠI HOẶC MÁY TÍNH</em>
+    </div>
+  </div>
+
+<script src="village.js"></script>
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    eyebrow: $('eyebrow'), headline: $('headline'), narration: $('narration'),
+    caption: $('caption'), cards: $('cards'), logo: $('logo'), entry: $('entry'),
+    eyes: $('eyes'), channels: $('channels'), tally: $('tally'), dim: $('dim'),
+    feats: $('feats'), cta: $('cta'),
+  };
+  const OVERLAYS = [el.cards, el.logo, el.entry, el.eyes, el.channels, el.tally, el.dim, el.feats, el.cta];
+  const TEXTS = [el.eyebrow, el.headline, el.narration, el.caption];
+
+  function fitStage() {
+    stage.style.transform = `scale(${Math.min(innerWidth / 1280, (innerHeight - 64) / 720)})`;
+  }
+  addEventListener('resize', fitStage); fitStage();
+
+  // =====================================================================
+  // LONG TIENG - chay duoc tren MOI trinh duyet
+  // Nguon chinh la /api/tts cua chinh server nay (xem server/tts.js): tra ve mp3 tieng
+  // Viet nen Firefox, Coc Coc, Safari deu phat duoc, va giong giong het nhau o moi may -
+  // dieu nay quan trong khi quay video. Chi khi /api/tts hong (mo bang file://, mat mang,
+  // dinh gioi han 30 yeu cau) moi roi ve speechSynthesis cua trinh duyet.
+  // Server chi nhan cau <= 200 ky tu nen moi cau doc deu phai ngan.
+  // =====================================================================
+  const SAY = {
+    moDau:   'Giữa rừng sâu, có một ngôi làng. Ban ngày yên ả.',
+    cauHoi:  'Nhưng khi màn đêm buông xuống, không ai còn chắc người ngồi cạnh mình là ai.',
+    vaoLang: 'Chỉ cần một đường link. Ba đến hai mươi người. Không cần tài khoản.',
+    vaiTro:  'Mười sáu vai trò. Mỗi người một lá bài riêng, không ai biết lá bài của người khác.',
+    baySoi:  'Đêm xuống, cả làng nhắm mắt. Bầy Sói hãy dậy, và chọn lấy con mồi đêm nay.',
+    baKenh:  'Bầy Sói bàn bạc riêng. Người đã khuất trò chuyện với nhau. Người sống không nghe được gì.',
+    boPhieu: 'Trời sáng. Một người đã không còn thức dậy nữa. Thảo luận, buộc tội, rồi bỏ phiếu.',
+    tinhNang:'Web lo hết phần quản trò: chia vai, dẫn đêm, đếm giờ, gom phiếu. Bạn chỉ việc chơi.',
+    chot:    'Trăng Khuyết. Ma Sói Online.',
+    moiGoi:  'Thắp lửa, gọi bạn bè, và bước vào ngôi làng.',
+  };
+
+  const synth = 'speechSynthesis' in window ? speechSynthesis : null;
+  let voiceOn = true, viVoice = null, voiceSource = 'none', ttsBase = null, playingClip = null;
+  const clips = new Map();   // ten cau -> the Audio da tai san
+
+  // Uu tien cao nhat: file mp3 thu san trong public/sounds/intro/. Co file thi khong can
+  // mang, khong can server, va giong giong het nhau moi lan quay. Tao file bang lenh
+  //   node scripts/make-intro-voice.cjs
+  const VOICE_DIR = 'sounds/intro/';
+
+  // Trang nay hay duoc mo bang Live Server (cong 5500) hoac mo thang bang file://, luc do
+  // /api/tts cua chinh trang khong ton tai. Nen thu lan luot vai noi, lay noi nao doc duoc:
+  //   ?tts=... neu nguoi dung chi dinh  ->  chinh trang nay  ->  server chay o may  ->  web that.
+  const onLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  const TTS_BASES = [
+    new URLSearchParams(location.search).get('tts'),
+    location.protocol === 'file:' ? null : '',
+    // Chi thu may minh khi dang mo o may minh: trang chay tren https ma goi http://localhost
+    // thi trinh duyet chan vi noi dung lan lon http/https, lai bao loi do trong Console.
+    onLocal || location.protocol === 'file:' ? 'http://localhost:3000' : null,
+    'https://game-ma-soi-1.onrender.com',
+  ].filter((base) => base !== null);
+
+  const ttsUrl = (base, text) => `${base}/api/tts?text=${encodeURIComponent(text)}`;
+
+  // Thu tai mot file de biet no co phat duoc khong. Khong dung fetch vi the Audio phat
+  // duoc file tu may chu khac ma khong can CORS, con fetch thi can.
+  function probe(url) {
+    return new Promise((resolve) => {
+      const audio = new Audio(url);
+      audio.preload = 'auto';
+      const done = (ok) => { clearTimeout(timer); resolve(ok); };
+      const timer = setTimeout(() => done(false), 4000);
+      audio.addEventListener('canplaythrough', () => done(true), { once: true });
+      audio.addEventListener('error', () => done(false), { once: true });
+      audio.load();
+    });
+  }
+
+  // Tai ca 10 cau cung luc va dem xem da tai xong bao nhieu, de nut o giua bao tien do.
+  // Server tren Render ngu khi khong ai dung, lan goi dau co the mat vai chuc giay - vi vay
+  // phai bat dau tai NGAY luc mo trang, khong doi toi luc bam phat.
+  function loadClips(urlFor) {
+    let ready = 0;
+    const total = Object.keys(SAY).length;
+    Object.keys(SAY).forEach((key) => {
+      const audio = new Audio(urlFor(key));
+      audio.preload = 'auto';
+      const tick = () => { ready += 1; onVoiceProgress(ready, total); };
+      audio.addEventListener('canplaythrough', tick, { once: true });
+      audio.addEventListener('error', tick, { once: true });   // hong cau nao thi cau do doc bang giong trinh duyet
+      audio.load();
+      clips.set(key, audio);
+    });
+    onVoiceProgress(0, total);
+  }
+
+  // Do song song thay vi lan luot: lan luot thi moi noi hong phai cho het 4 giay moi sang
+  // noi sau, cong lai rat lau. Lay noi nao tra loi dau tien.
+  function firstWorking(urls) {
+    return new Promise((resolve) => {
+      let left = urls.length;
+      urls.forEach((url, i) => probe(url).then((ok) => {
+        if (ok) return resolve(i);
+        if (--left === 0) resolve(-1);
+      }));
+    });
+  }
+
+  async function pickVoiceSource() {
+    // 1. File mp3 thu san (giong Adam hoac bat ky giong nao ban chon)
+    if (await probe(VOICE_DIR + 'moDau.mp3')) {
+      voiceSource = 'file';
+      return loadClips((key) => `${VOICE_DIR}${key}.mp3`);
+    }
+    // 2. Giong doc tu /api/tts cua server
+    const hit = await firstWorking(TTS_BASES.map((base) => ttsUrl(base, 'Trăng Khuyết')));
+    if (hit > -1) {
+      voiceSource = 'server'; ttsBase = TTS_BASES[hit];
+      return loadClips((key) => ttsUrl(ttsBase, SAY[key]));
+    }
+    // 3. Khong co gi: roi ve giong trinh duyet trong say()
+    readyToPlay();
+  }
+
+  // Nut o giua: khoa lai trong luc tai giong, nhung khong khoa qua 15 giay - tha chay
+  // khong loi con hon bat nguoi dung ngoi cho mai.
+  let unlocked = false;
+  function readyToPlay() {
+    if (unlocked) return;
+    unlocked = true;
+    const btn = $('btn-play');
+    btn.disabled = false;
+    btn.textContent = '▶ Phát intro';
+    updateVoiceNote();
+  }
+  function onVoiceProgress(ready, total) {
+    if (ready >= total) return readyToPlay();
+    if (!unlocked) $('btn-play').textContent = `Đang tải giọng… ${ready}/${total}`;
+  }
+  setTimeout(readyToPlay, 15000);
+
+  // Giong du phong cua trinh duyet. Edge tra ve giong tieng Anh truoc, giong tieng Viet
+  // toi sau qua su kien voiceschanged, nen phai cho chu khong lay ngay (nhu public/audio.js).
+  function findVi() {
+    const vi = (synth ? synth.getVoices() : []).filter((v) => /^vi\b|^vi[-_]/i.test(v.lang));
+    return vi.find((v) => /viet|hoai|nam|linh/i.test(v.name)) || vi[0] || null;
+  }
+  function watchLocalVoice() {
+    if (!synth) return;
+    viVoice = findVi();
+    synth.addEventListener?.('voiceschanged', () => { viVoice = findVi(); updateVoiceNote(); });
+  }
+  function sayLocal(text) {
+    if (!synth || !viVoice) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.voice = viVoice; u.lang = viVoice.lang;
+    u.rate = 0.92; u.pitch = 0.85;
+    synth.speak(u);
+  }
+  function stopVoice() {
+    synth?.cancel();
+    if (playingClip) { playingClip.pause(); playingClip.currentTime = 0; playingClip = null; }
+  }
+  // say() nhan TEN cau (khoa trong SAY), khong phai noi dung, de con tra ra dung file mp3.
+  function say(key) {
+    if (!voiceOn || !SAY[key]) return;
+    stopVoice();
+    const clip = clips.get(key);
+    if (!clip) return sayLocal(SAY[key]);
+    playingClip = clip;
+    clip.currentTime = 0;
+    // Khong phat duoc (mat mang, bi chan tu phat) thi doc bang giong trinh duyet.
+    clip.play().catch(() => { voiceSource = 'none'; updateVoiceNote(); sayLocal(SAY[key]); });
+  }
+  function updateVoiceNote() {
+    const note = $('voice-note');
+    if (!unlocked) { note.className = ''; note.textContent = ''; return; }
+    if (voiceSource === 'file') { note.className = ''; note.textContent = 'GIỌNG: FILE THU SẴN'; return; }
+    if (voiceSource === 'server') {
+      note.className = '';
+      note.textContent = 'GIỌNG: ' + (ttsBase === '' ? 'máy chủ' : ttsBase.replace(/^https?:\/\//, '')).toUpperCase();
+      return;
+    }
+    note.className = 'warn';
+    note.textContent = viVoice
+      ? 'Giọng: trình duyệt'
+      : '⚠ Chưa có giọng — chạy node scripts/make-intro-voice.cjs';
+  }
+  watchLocalVoice(); updateVoiceNote(); pickVoiceSource();
+
+  // ---------- Nguoi choi gia, de village.js ve vong nguoi quanh lua trai ----------
+  const players = (n, dead = 0) =>
+    Array.from({ length: n }, (_, i) => ({ id: String(i), alive: i >= dead, connected: true }));
+  const scene = (phase, n, dead) => villageArt.update({ phase, players: players(n, dead) });
+
+  // ---------- 16 vai, dung dung ten file trong assets/roles ----------
+  const ROLES = [
+    ['villager', 'Dân làng'], ['werewolf', 'Sói thường'], ['wolfcub', 'Sói con'], ['whitewolf', 'Sói trắng'],
+    ['seer', 'Tiên tri'], ['guard', 'Bảo vệ'], ['witch', 'Phù thủy'], ['hunter', 'Thợ săn'],
+    ['cupid', 'Cupid'], ['lycan', 'Người hóa sói'], ['cursed', 'Kẻ bị nguyền'], ['elder', 'Già làng'],
+    ['toughguy', 'Người cứng cỏi'], ['prince', 'Hoàng tử'], ['tanner', 'Chán đời'], ['mason', 'Tam điểm'],
+  ];
+  ROLES.forEach(([id, ten], i) => {
+    const card = document.createElement('div');
+    card.className = 'role-card';
+    card.style.animationDelay = `${i * 70}ms`;
+    card.innerHTML = `<img src="assets/roles/${id}-retro.png" alt="${ten}" /><span>${ten.toUpperCase()}</span>`;
+    el.cards.appendChild(card);
+  });
+
+  // ---------- Canh 8: cac chuc nang di kem, lay dung theo README ----------
+  const FEATS = [
+    ['🎭', 'Quản trò ảo', 'Tự chia vai riêng tư cho từng người'],
+    ['🌙', 'Dẫn từng lượt đêm', 'Sói, Tiên tri, Phù thủy, Bảo vệ, Cupid…'],
+    ['⏱️', 'Tự đếm giờ', 'Chuyển pha và gom phiếu, không cần quản trò'],
+    ['🎙️', 'Nói bằng giọng thật', 'Voice trực tiếp, tự tách kênh theo phe'],
+    ['💬', 'Chat riêng theo phe', 'Làng, Bầy Sói và Âm phủ không đọc được của nhau'],
+    ['🔊', 'Giọng dẫn chuyện Việt', '“Bầy Sói hãy dậy…” đọc tự động'],
+    ['🎵', 'Nhạc đổi theo ngày đêm', 'Hai bản nhạc riêng cho ngày và đêm'],
+    ['🔌', 'Rớt mạng vẫn vào lại', 'Giữ chỗ 30 giây, lấy lại đúng lịch sử được đọc'],
+    ['🔁', 'Chơi lại ngay', 'Không phải tạo phòng mới, không cần tài khoản'],
+  ];
+  FEATS.forEach(([icon, ten, mo], i) => {
+    const node = document.createElement('div');
+    node.className = 'feat';
+    node.style.animationDelay = `${i * 90}ms`;
+    node.innerHTML = `<b>${icon}</b><span>${ten}<small>${mo}</small></span>`;
+    el.feats.appendChild(node);
+  });
+
+  // ---------- Loi cai nhau o canh bo phieu ----------
+  const BUBBLES = [
+    { at: 200,  live: 2600, x: 110, y: 230, cls: '',     text: 'Minh là Sói, tôi chắc chắn!' },
+    { at: 1000, live: 2400, x: 640, y: 320, cls: 'deny', text: 'Tôi dân thường mà, oan quá!' },
+    { at: 1900, live: 2400, x: 170, y: 400, cls: '',     text: 'Tối qua Nguyệt im lặng bất thường…' },
+    { at: 2900, live: 2600, x: 560, y: 196, cls: 'seer', text: 'Tôi là Tiên tri. Tôi soi ra Phước!' },
+    { at: 3900, live: 2200, x: 92,  y: 520, cls: 'deny', text: 'Đừng tin Hương, nó bênh Minh' },
+    { at: 4900, live: 2200, x: 600, y: 470, cls: '',     text: 'Phước đang đánh lạc hướng đấy' },
+    { at: 6100, live: 2400, x: 300, y: 582, cls: '',     text: 'Bỏ phiếu Minh đi, hết giờ rồi!' },
+  ];
+
+  const timers = [];
+  const after = (ms, fn) => timers.push(setTimeout(fn, ms));
+  const show = (node, html) => { if (html != null) node.innerHTML = html; node.classList.add('on'); };
+  const hideAll = (keep = []) => {
+    [...TEXTS, ...OVERLAYS].forEach((n) => { if (!keep.includes(n)) n.classList.remove('on'); });
+    el.narration.classList.remove('typing');
+  };
+
+  function typeOut(node, text, speed = 60) {
+    node.innerHTML = ''; node.classList.add('typing'); show(node);
+    [...text].forEach((ch, i) => after(i * speed, () => { node.innerHTML += ch; }));
+  }
+
+  function spawnBubbles(base) {
+    BUBBLES.forEach((b) => after(base + b.at, () => {
+      const node = document.createElement('div');
+      node.className = `bubble ${b.cls}`;
+      node.style.left = b.x + 'px'; node.style.top = b.y + 'px';
+      node.textContent = b.text;
+      stage.appendChild(node);
+      requestAnimationFrame(() => node.classList.add('on'));
+      after(b.live, () => { node.classList.add('off'); after(400, () => node.remove()); });
+    }));
+  }
+
+  // =====================================================================
+  // KICH BAN 9 CANH (~80 giay). Sua moc thoi gian o 'at' la doi duoc nhip phim.
+  // =====================================================================
+  const SCRIPT = [
+    {
+      at: 0, ten: 'Trăng lên',
+      run() {
+        scene('NIGHT_WOLF', 7, 0);
+        after(900,  () => show(el.eyebrow, 'TRÒ CHƠI SUY LUẬN CÙNG BẠN BÈ'));
+        after(1700, () => { show(el.caption, 'Giữa rừng sâu, có một ngôi làng.<br>Ban ngày yên ả…'); say('moDau'); });
+      },
+    },
+    {
+      at: 6500, ten: 'Câu hỏi lớn',
+      run() {
+        show(el.headline, 'Khi đêm xuống,<br>ai là <em>Sói?</em>');
+        after(400,  () => say('cauHoi'));
+        after(4200, () => show(el.caption, 'Một bí mật đang ẩn mình giữa những gương mặt quen thuộc.'));
+      },
+    },
+    {
+      at: 13500, ten: 'Ghé vào làng',
+      run() {
+        show(el.eyebrow, 'CUỘC CHƠI BẮT ĐẦU TỪ ĐÂY');
+        after(300,  () => show(el.entry));
+        after(900,  () => say('vaoLang'));
+        after(1400, () => show(el.caption,
+          '<strong>3–20 người</strong>, mỗi người một thiết bị riêng.'
+          + '<br><span style="color:var(--accent-2);font-family:var(--mono);font-size:14px;letter-spacing:1.5px">game-ma-soi-1.onrender.com</span>'));
+      },
+    },
+    {
+      at: 20500, ten: '16 vai trò',
+      run() {
+        show(el.cards);
+        after(600,  () => say('vaiTro'));
+        after(1200, () => show(el.caption, '<strong>16 vai trò.</strong> Mỗi người một lá bài riêng.'));
+      },
+    },
+    {
+      at: 29000, ten: 'Bầy Sói hãy dậy',
+      run() {
+        scene('NIGHT_WOLF', 7, 0);
+        show(el.dim);
+        after(600,  () => show(el.eyes));
+        after(900,  () => typeOut(el.narration, 'Bầy Sói hãy dậy…'));
+        after(1200, () => say('baySoi'));
+        after(5200, () => show(el.caption, 'Mỗi đêm, bầy Sói chọn một người để cắn.'));
+      },
+    },
+    {
+      at: 37500, ten: 'Ba kênh riêng',
+      run() {
+        el.dim.classList.add('on');
+        show(el.channels);
+        after(500,  () => say('baKenh'));
+        after(1400, () => show(el.caption, 'Chat chữ và nói bằng giọng thật — <strong>ba kênh tách biệt</strong>.'));
+      },
+    },
+    {
+      at: 46500, ten: 'Trời sáng · bỏ phiếu',
+      run() {
+        scene('DAY_DISCUSS', 7, 1);
+        show(el.eyebrow, 'NGÀY THỨ NHẤT · THẢO LUẬN');
+        spawnBubbles(600);
+        after(600,  () => say('boPhieu'));
+        after(5600, () => show(el.tally));
+        after(6200, () => show(el.caption, 'Hôm nay, <strong>ai sẽ bị treo cổ?</strong>'));
+      },
+    },
+    {
+      at: 56500, ten: 'Chức năng đi kèm',
+      run() {
+        scene('NIGHT_WOLF', 7, 1);
+        el.dim.classList.add('on');
+        show(el.eyebrow, 'CÒN NHIỀU HƠN MỘT VÁN MA SÓI');
+        after(300,  () => show(el.feats));
+        after(800,  () => say('tinhNang'));
+      },
+    },
+    {
+      at: 67500, ten: 'Chốt',
+      run() {
+        scene('NIGHT_WOLF', 7, 3);
+        after(600,  () => show(el.logo));
+        after(1200, () => say('chot'));
+        after(5000, () => show(el.cta));
+        after(5400, () => say('moiGoi'));
+      },
+    },
+  ];
+  const END = 81000;   // man chot keo dai ~13.5 giay roi moi mo dan
+
+  function play() {
+    timers.forEach(clearTimeout); timers.length = 0;
+    stopVoice();
+    document.querySelectorAll('.bubble').forEach((n) => n.remove());
+    hideAll();
+    stage.classList.remove('ending');
+    stage.classList.add('playing');
+
+    SCRIPT.forEach((s) => after(s.at, () => { hideAll(); s.run(); }));
+    // Cuoi phim: canh lang toi dan, nhung logo va nut vao choi o lai tren nen den
+    // de nguoi xem con bam duoc. Quay video thi day cung la khung dung hinh dep.
+    after(END - 2400, () => { hideAll([el.logo, el.cta]); stage.classList.add('ending'); });
+    after(END, () => stage.classList.remove('playing'));
+  }
+
+  // ---------- Nhac nen co san trong project, bat san ----------
+  const music = new Audio('sounds/bgm-night.wav');
+  music.loop = true; music.volume = .2;   // de thap de khong lan giong doc
+
+  function start() {
+    stage.classList.add('started');
+    music.currentTime = 0;
+    music.play().catch(() => {});   // chua cham vao trang thi trinh duyet chan, bo qua
+    play();
+  }
+  $('btn-play').addEventListener('click', start);
+  addEventListener('keydown', (e) => { if (e.key === 'r' || e.key === 'R') start(); });
+
+  scene('NIGHT_WOLF', 7, 0);
+})();
+</script>
+</body>
+</html>

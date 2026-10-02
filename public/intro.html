@@ -43,7 +43,7 @@
   #hint { position: absolute; inset: 0; z-index: 6; display: grid; place-content: center;
     justify-items: center; gap: 22px; text-align: center; pointer-events: none;
     transition: opacity .5s ease; }
-  #stage.started #hint { opacity: 0; }
+  #stage.started #hint { opacity: 0; visibility: hidden; }
   #hint b { font: 400 58px/1.1 var(--serif); color: var(--text); letter-spacing: 1px;
     text-shadow: 0 4px 30px #000; }
   #btn-play { pointer-events: auto; padding: 17px 46px; font: 600 17px var(--sans);
@@ -56,6 +56,32 @@
   #voice-note { font: 11px var(--mono); letter-spacing: 2px; color: #8fa89b; min-height: 15px; }
   #voice-note.warn { color: #e0a06a; }
 
+  /* ---------- Tam dung ---------- */
+  /* Dung het hieu ung dang chay: lua, sao nhap nhay, bong bong hien ra, con tro go chu.
+     Rieng tranh lang do village.js ve bang canvas nen van chay - de vay cho canh khong
+     chet cung. */
+  #stage.paused *, #stage.paused *::before, #stage.paused *::after {
+    animation-play-state: paused !important;
+  }
+  #pause-layer { position: absolute; inset: 0; z-index: 7; display: grid; place-content: center;
+    justify-items: center; gap: 18px; background: #0b1417b0; opacity: 0;
+    pointer-events: none; transition: opacity .25s ease; }
+  #stage.paused #pause-layer { opacity: 1; pointer-events: auto; }
+  #pause-layer b { font: 400 40px/1.1 var(--serif); color: var(--text); letter-spacing: 1px; }
+  #btn-resume { padding: 15px 40px; font: 600 16px var(--sans); letter-spacing: .5px;
+    color: #172322; border: 0; cursor: pointer;
+    background: linear-gradient(110deg, #e6c58d, #cfa064); box-shadow: 0 4px 0 #7c603d;
+    transition: transform .15s ease, background .15s ease; }
+  #btn-resume:hover { background: #efd4a3; transform: translateY(-2px); }
+  #pause-layer span { font: 11px var(--mono); letter-spacing: 3px; color: var(--text-dim); }
+
+  /* Goi y nho o goc, chi hien trong luc phim dang chay */
+  #tip { position: absolute; right: 18px; bottom: 16px; z-index: 6; opacity: 0;
+    font: 10px var(--mono); letter-spacing: 2px; color: #ffffff40; pointer-events: none; }
+  #stage.playing #tip { animation: tip-fade 7s ease forwards; }
+  #stage.paused #tip { opacity: 0 !important; }
+  @keyframes tip-fade { 12% { opacity: 1; } 65% { opacity: 1; } 100% { opacity: 0; } }
+
   /* ---------- Cac lop chu ---------- */
   .beat { position: absolute; left: 0; right: 0; text-align: center; opacity: 0;
     transition: opacity .7s ease, transform .7s ease;
@@ -67,7 +93,7 @@
   #headline { top: 230px; font: 400 74px/1.14 var(--serif); color: var(--text);
     letter-spacing: -1px; text-shadow: 0 4px 34px #000d; }
   #headline em { color: var(--accent-2); font-style: italic; }
-  #caption { bottom: 96px; font-size: 21px; line-height: 1.75; color: var(--text-dim);
+  #caption { bottom: 52px; font-size: 21px; line-height: 1.75; color: var(--text-dim);
     text-shadow: 0 2px 18px #000; }
   #caption strong { color: var(--text); font-weight: 600; }
   #narration { top: 140px; font: 400 44px/1.35 var(--serif); color: var(--accent);
@@ -190,10 +216,7 @@
     transition: transform .15s ease, background .15s ease; }
   #cta a:hover { background: #efd4a3; transform: translateY(-2px); }
   #cta a span { float: right; margin-left: 14px; }
-  #cta .url { display: block; margin-top: 18px; font: 13px var(--mono);
-    letter-spacing: 1.5px; color: var(--accent-2); text-decoration: none; }
-  #cta .url:hover { color: var(--text); }
-  #cta em { display: block; margin-top: 12px; font: 11px var(--mono); font-style: normal;
+  #cta em { display: block; margin-top: 20px; font: 11px var(--mono); font-style: normal;
     letter-spacing: 3px; color: var(--text-dim); }
 
 </style>
@@ -256,8 +279,14 @@
       <a href="https://game-ma-soi-1.onrender.com" target="_blank" rel="noopener">
         Thắp lửa · Vào chơi ngay <span aria-hidden="true">↗</span>
       </a>
-      <a class="url" href="https://game-ma-soi-1.onrender.com" target="_blank" rel="noopener">game-ma-soi-1.onrender.com</a>
       <em>CHƠI NGAY TRÊN ĐIỆN THOẠI HOẶC MÁY TÍNH</em>
+    </div>
+
+    <div id="tip">BẤM VÀO MÀN HÌNH ĐỂ TẠM DỪNG</div>
+    <div id="pause-layer">
+      <b>Tạm dừng</b>
+      <button id="btn-resume">▶ Tiếp tục</button>
+      <span>HOẶC BẤM VÀO MÀN HÌNH</span>
     </div>
   </div>
 
@@ -502,8 +531,27 @@
     { at: 6100, live: 2400, x: 300, y: 582, cls: '',     text: 'Bỏ phiếu Minh đi, hết giờ rồi!' },
   ];
 
-  const timers = [];
-  const after = (ms, fn) => timers.push(setTimeout(fn, ms));
+  // Bo hen gio tinh theo DONG HO CUA PHIM, khong phai dong ho that: luc tam dung thi
+  // dong ho phim dung lai, nen moi moc con lai van cach nhau dung nhu cu khi phat tiep.
+  let clockFrom = 0, pausedAt = 0, paused = false;
+  const tasks = [];
+  const elapsed = () => (paused ? pausedAt : performance.now() - clockFrom);
+  function arm(task) {
+    task.timer = setTimeout(() => { task.done = true; task.fn(); }, Math.max(0, task.due - elapsed()));
+  }
+  // Doi SPEED la doi nhip ca phim: 1 la nhip goc, nho hon 1 thi nhanh hon. Nhan o day
+  // nen moi thu nhanh theo - canh, loi doc, go tung chu, bong bong thoai.
+  const SPEED = 0.85;
+  function after(ms, fn) {
+    const task = { due: elapsed() + ms * SPEED, fn, timer: null, done: false };
+    tasks.push(task);
+    if (!paused) arm(task);
+    return task;
+  }
+  function clearTasks() {
+    tasks.forEach((t) => clearTimeout(t.timer));
+    tasks.length = 0;
+  }
   const show = (node, html) => { if (html != null) node.innerHTML = html; node.classList.add('on'); };
   const hideAll = (keep = []) => {
     [...TEXTS, ...OVERLAYS].forEach((n) => { if (!keep.includes(n)) n.classList.remove('on'); });
@@ -621,7 +669,9 @@
   const END = 81000;   // man chot keo dai ~13.5 giay roi moi mo dan
 
   function play() {
-    timers.forEach(clearTimeout); timers.length = 0;
+    clearTasks();
+    paused = false; pausedAt = 0; clockFrom = performance.now();
+    stage.classList.remove('paused');
     stopVoice();
     document.querySelectorAll('.bubble').forEach((n) => n.remove());
     hideAll();
@@ -639,6 +689,37 @@
   const music = new Audio('sounds/bgm-night.wav');
   music.loop = true; music.volume = .2;   // de thap de khong lan giong doc
 
+  // ---------- Bam vao man hinh de tam dung, bam nut giua de phat tiep ----------
+  function pause() {
+    if (paused || !stage.classList.contains('playing')) return;
+    pausedAt = performance.now() - clockFrom;
+    paused = true;
+    tasks.forEach((t) => { if (!t.done) clearTimeout(t.timer); });
+    if (playingClip && !playingClip.ended) playingClip.pause();
+    music.pause();
+    synth?.pause();              // giong trinh duyet cung dung giua chung duoc
+    stage.classList.add('paused');
+  }
+  function resume() {
+    if (!paused) return;
+    paused = false;
+    clockFrom = performance.now() - pausedAt;
+    tasks.forEach((t) => { if (!t.done) arm(t); });
+    if (playingClip && !playingClip.ended) playingClip.play().catch(() => {});
+    music.play().catch(() => {});
+    synth?.resume();
+    stage.classList.remove('paused');
+  }
+
+  function togglePause(e) {
+    // Bam vao nut hay duong link thi lam dung viec cua no, khong tam dung phim
+    if (e?.target?.closest?.('a, button')) return;
+    if (!stage.classList.contains('playing')) return;
+    paused ? resume() : pause();
+  }
+  document.addEventListener('click', togglePause);
+  $('btn-resume').addEventListener('click', resume);
+
   function start() {
     stage.classList.add('started');
     music.currentTime = 0;
@@ -646,7 +727,10 @@
     play();
   }
   $('btn-play').addEventListener('click', start);
-  addEventListener('keydown', (e) => { if (e.key === 'r' || e.key === 'R') start(); });
+  addEventListener('keydown', (e) => {
+    if (e.key === 'r' || e.key === 'R') return start();
+    if (e.key === ' ') { e.preventDefault(); togglePause(); }
+  });
 
   scene('NIGHT_WOLF', 7, 0);
 })();

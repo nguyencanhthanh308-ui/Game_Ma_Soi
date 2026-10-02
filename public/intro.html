@@ -51,8 +51,6 @@
     background: linear-gradient(110deg, #e6c58d, #cfa064); box-shadow: 0 4px 0 #7c603d;
     transition: transform .15s ease, background .15s ease; }
   #btn-play:hover:not(:disabled) { background: #efd4a3; transform: translateY(-2px); }
-  #btn-play:disabled { cursor: progress; background: #2a3b3a; color: #7f8f88;
-    box-shadow: 0 4px 0 #1b2928; }
   #voice-note { font: 11px var(--mono); letter-spacing: 2px; color: #8fa89b; min-height: 15px; }
   #voice-note.warn { color: #e0a06a; }
 
@@ -223,6 +221,16 @@
   #cta em { display: block; margin-top: 20px; font: 11px var(--mono); font-style: normal;
     letter-spacing: 3px; color: var(--text-dim); }
 
+
+  /* Dien thoai cam doc: khung 16:9 chi chiem mot dai hep giua man hinh. Mach nguoi dung
+     xoay ngang, luc do phim phu gan kin. Chi hien o man nho va dang cam doc. */
+  #rotate { display: none; }
+  @media (orientation: portrait) and (max-width: 860px) {
+    #rotate { display: block; position: fixed; left: 0; right: 0; bottom: 22px; z-index: 9;
+      text-align: center; font: 11px var(--mono); letter-spacing: 2px; color: #8fa89b; }
+    #hint b { font-size: 34px; }
+    #btn-play { padding: 14px 32px; font-size: 15px; }
+  }
 </style>
 </head>
 <body>
@@ -238,7 +246,7 @@
     <div id="blackout"></div>
     <div id="hint">
       <b>Trăng Khuyết</b>
-      <button id="btn-play" disabled>Đang tải giọng…</button>
+      <button id="btn-play">▶ Phát intro</button>
       <span id="voice-note"></span>
     </div>
 
@@ -294,6 +302,8 @@
     </div>
   </div>
 
+  <p id="rotate">↻ XOAY NGANG ĐIỆN THOẠI ĐỂ XEM RÕ HƠN</p>
+
 <script src="village.js"></script>
 <script>
 (() => {
@@ -309,7 +319,7 @@
   const TEXTS = [el.eyebrow, el.headline, el.narration, el.caption];
 
   function fitStage() {
-    stage.style.transform = `scale(${Math.min(innerWidth / 1280, (innerHeight - 64) / 720)})`;
+    stage.style.transform = `scale(${Math.min(innerWidth / 1280, innerHeight / 720)})`;
   }
   addEventListener('resize', fitStage); fitStage();
 
@@ -420,20 +430,17 @@
 
   // Nut o giua: khoa lai trong luc tai giong, nhung khong khoa qua 15 giay - tha chay
   // khong loi con hon bat nguoi dung ngoi cho mai.
-  let unlocked = false;
+  let unlocked = false, loadNote = '';
   function readyToPlay() {
-    if (unlocked) return;
     unlocked = true;
-    const btn = $('btn-play');
-    btn.disabled = false;
-    btn.textContent = '▶ Phát intro';
+    loadNote = '';
     updateVoiceNote();
   }
   function onVoiceProgress(ready, total) {
     if (ready >= total) return readyToPlay();
-    if (!unlocked) $('btn-play').textContent = `Đang tải giọng… ${ready}/${total}`;
+    loadNote = `ĐANG TẢI GIỌNG… ${ready}/${total}`;
+    updateVoiceNote();
   }
-  setTimeout(readyToPlay, 15000);
 
   // Giong du phong cua trinh duyet. Edge tra ve giong tieng Anh truoc, giong tieng Viet
   // toi sau qua su kien voiceschanged, nen phai cho chu khong lay ngay (nhu public/audio.js).
@@ -470,7 +477,7 @@
   }
   function updateVoiceNote() {
     const note = $('voice-note');
-    if (!unlocked) { note.className = ''; note.textContent = ''; return; }
+    if (!unlocked) { note.className = ''; note.textContent = loadNote; return; }
     if (voiceSource === 'file') { note.className = ''; note.textContent = 'GIỌNG: FILE THU SẴN'; return; }
     if (voiceSource === 'server') {
       note.className = '';
@@ -726,6 +733,9 @@
 
   function start() {
     stage.classList.add('started');
+    // Phai goi load() NGAY trong cu cham: dien thoai chi cho tai file am thanh khi co
+    // thao tac cua nguoi dung, goi tre hon mot nhip la bi tu choi.
+    clips.forEach((clip) => { try { clip.load(); } catch (_) {} });
     music.currentTime = 0;
     music.play().catch(() => {});   // chua cham vao trang thi trinh duyet chan, bo qua
     play();

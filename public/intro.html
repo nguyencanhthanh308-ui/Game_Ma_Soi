@@ -240,6 +240,29 @@
   #stage.narrow #channels { padding: 0 60px; }
   #stage.narrow #tally { right: 28px; }
 
+  /* ---------- Thanh dieu khien: tua, bo qua, va cac chuong bam duoc ---------- */
+  /* Nam ngoai #safe nen khong co gian theo phim - nut luon du to de bam o moi man hinh.
+     Tu an sau vai giay khong dong vao, de khong dinh vao khung quay video. */
+  #controls { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8;
+    display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+    background: linear-gradient(to top, #0b1417ee, #0b141700);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease; }
+  #stage.playing.show-controls #controls, #stage.paused #controls {
+    opacity: 1; pointer-events: auto; }
+  #controls button { background: #1b2d2fdd; color: var(--text); border: 1px solid #3c5148;
+    border-radius: 3px; cursor: pointer; font: 13px var(--sans); padding: 9px 13px;
+    min-height: 38px; white-space: nowrap; }
+  #controls button:hover { background: #2c443d; }
+  #btn-skip { font-size: 12px; letter-spacing: .5px; }
+
+  #chapters { flex: 1; display: flex; gap: 4px; align-items: center; }
+  #chapters button { flex: 1; min-height: 20px; padding: 0; border: 0; border-radius: 0;
+    background: #ffffff26; position: relative; overflow: hidden; height: 5px;
+    transition: height .15s ease; }
+  #chapters button:hover { height: 11px; background: #ffffff40; }
+  #chapters button i { position: absolute; inset: 0 auto 0 0; width: 0;
+    background: var(--accent); display: block; }
+
   #rotate { display: none; }
   @media (orientation: portrait) and (max-width: 860px) {
     #rotate { display: block; position: fixed; left: 0; right: 0; bottom: 22px; z-index: 9;
@@ -315,7 +338,14 @@
 
     </div>
 
-    <div id="tip">BẤM VÀO MÀN HÌNH ĐỂ TẠM DỪNG</div>
+    <div id="controls">
+      <button id="btn-prev" type="button" title="Cảnh trước (←)" aria-label="Cảnh trước">⏮</button>
+      <button id="btn-next" type="button" title="Cảnh sau (→)" aria-label="Cảnh sau">⏭</button>
+      <div id="chapters"></div>
+      <button id="btn-skip" type="button" title="Tới màn cuối (S)">Bỏ qua ⏭</button>
+    </div>
+
+    <div id="tip">BẤM MÀN HÌNH ĐỂ TẠM DỪNG · ← → ĐỔI CẢNH</div>
     <div id="pause-layer">
       <b>Tạm dừng</b>
       <button id="btn-resume">▶ Tiếp tục</button>
@@ -710,22 +740,89 @@
   ];
   const END = 81000;   // man chot keo dai ~13.5 giay roi moi mo dan
 
-  function play() {
+  let sceneIndex = 0;
+
+  // Phat tu canh thu i. Tua di tua lai chi la goi lai ham nay voi i khac: xoa het hen gio
+  // cu, keo dong ho phim ve dung moc cua canh do, roi dung canh day len va hen lai cac
+  // canh sau. Nho vay tua xong moi thu van dung nhip nhu xem lien mach.
+  function playFrom(i) {
+    const from = Math.max(0, Math.min(SCRIPT.length - 1, i));
+    sceneIndex = from;
+    const base = SCRIPT[from].at;
+
     clearTasks();
-    paused = false; pausedAt = 0; clockFrom = performance.now();
-    stage.classList.remove('paused');
     stopVoice();
     safe.querySelectorAll('.bubble').forEach((n) => n.remove());
     hideAll();
-    stage.classList.remove('ending');
-    stage.classList.add('playing');
+    paused = false; pausedAt = 0;
+    clockFrom = performance.now() - base * SPEED;
+    stage.classList.remove('paused', 'ending');
+    stage.classList.add('playing', 'started');
 
-    SCRIPT.forEach((s) => after(s.at, () => { hideAll(); s.run(); }));
+    SCRIPT[from].run();
+    SCRIPT.slice(from + 1).forEach((scene, k) => {
+      after(scene.at - base, () => { sceneIndex = from + 1 + k; hideAll(); scene.run(); });
+    });
     // Cuoi phim: canh lang toi dan, nhung logo va nut vao choi o lai tren nen den
     // de nguoi xem con bam duoc. Quay video thi day cung la khung dung hinh dep.
-    after(END - 2400, () => { hideAll([el.logo, el.cta]); stage.classList.add('ending'); });
-    after(END, () => stage.classList.remove('playing'));
+    after(END - 2400 - base, () => { hideAll([el.logo, el.cta]); stage.classList.add('ending'); });
+    after(END - base, () => { stage.classList.remove('playing'); stopProgress(); });
+    startProgress();
+    syncControls();
   }
+  const play = () => playFrom(0);
+  const seek = (delta) => playFrom(sceneIndex + delta);
+  const skip = () => playFrom(SCRIPT.length - 1);
+
+  // ---------- Thanh dieu khien ----------
+  // Moi canh mot o tren thanh: bam vao o nao la nhay thang toi canh do.
+  const chapters = $('chapters');
+  SCRIPT.forEach((scene, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = `${i + 1}. ${scene.ten}`;
+    btn.setAttribute('aria-label', btn.title);
+    btn.innerHTML = '<i></i>';
+    btn.addEventListener('click', () => playFrom(i));
+    chapters.appendChild(btn);
+  });
+  const chapterBtns = [...chapters.children];
+
+  // Vach do day o cac canh da qua, va chay dan trong canh dang xem
+  let progressFrame = null;
+  function syncControls() {
+    const now = elapsed() / SPEED;   // quy ve moc thoi gian goc trong SCRIPT
+    chapterBtns.forEach((btn, i) => {
+      const from = SCRIPT[i].at;
+      const to = i + 1 < SCRIPT.length ? SCRIPT[i + 1].at : END;
+      const part = Math.max(0, Math.min(1, (now - from) / (to - from)));
+      btn.firstChild.style.width = (part * 100) + '%';
+    });
+  }
+  function startProgress() {
+    if (progressFrame) return;
+    const tick = () => { progressFrame = requestAnimationFrame(tick); if (!paused) syncControls(); };
+    progressFrame = requestAnimationFrame(tick);
+  }
+  function stopProgress() {
+    if (progressFrame) cancelAnimationFrame(progressFrame);
+    progressFrame = null;
+    syncControls();
+  }
+
+  // Hien thanh dieu khien khi co dong chuot hoac cham, roi tu an sau 2.5 giay - de khong
+  // dinh vao khung quay video.
+  let hideControls = null;
+  function wakeControls() {
+    stage.classList.add('show-controls');
+    clearTimeout(hideControls);
+    hideControls = setTimeout(() => stage.classList.remove('show-controls'), 2500);
+  }
+  ['mousemove', 'touchstart', 'keydown'].forEach((ev) => addEventListener(ev, wakeControls));
+
+  $('btn-prev').addEventListener('click', () => seek(-1));
+  $('btn-next').addEventListener('click', () => seek(1));
+  $('btn-skip').addEventListener('click', skip);
 
   // ---------- Nhac nen co san trong project, bat san ----------
   const music = new Audio('sounds/bgm-night.wav');
@@ -741,6 +838,7 @@
     music.pause();
     synth?.pause();              // giong trinh duyet cung dung giua chung duoc
     stage.classList.add('paused');
+    syncControls();
   }
   function resume() {
     if (!paused) return;
@@ -755,7 +853,7 @@
 
   function togglePause(e) {
     // Bam vao nut hay duong link thi lam dung viec cua no, khong tam dung phim
-    if (e?.target?.closest?.('a, button')) return;
+    if (e?.target?.closest?.('a, button, #controls')) return;
     if (!stage.classList.contains('playing')) return;
     paused ? resume() : pause();
   }
@@ -774,7 +872,11 @@
   $('btn-play').addEventListener('click', start);
   addEventListener('keydown', (e) => {
     if (e.key === 'r' || e.key === 'R') return start();
-    if (e.key === ' ') { e.preventDefault(); togglePause(); }
+    if (e.key === ' ') { e.preventDefault(); return togglePause(); }
+    if (!stage.classList.contains('playing')) return;
+    if (e.key === 'ArrowLeft') seek(-1);
+    else if (e.key === 'ArrowRight') seek(1);
+    else if (e.key === 's' || e.key === 'S') skip();
   });
 
   scene('NIGHT_WOLF', 7, 0);

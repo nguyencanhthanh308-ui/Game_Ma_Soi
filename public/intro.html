@@ -19,14 +19,23 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; background: #000; overflow: hidden; }
-  body { display: grid; place-items: center; font-family: var(--sans); }
+  body { font-family: var(--sans); }
 
-  #stage { position: relative; width: 1280px; height: 720px; flex: none;
-    background: var(--bg); overflow: hidden; transform-origin: center; }
+  /* San khau phu kin man hinh o MOI ty le - khong con vien den. Tranh ngoi lang tu ve
+     theo dung ty le khung (xem fitCanvas trong village.js) nen keo rong hay hep deu dep. */
+  #stage { position: fixed; inset: 0; background: var(--bg); overflow: hidden; }
+  /* Con chu va the thi nam trong vung an toan co kich thuoc co dinh roi thu nho vua man
+     hinh: bo cuc giu nguyen ty le, khong bao gio bi cat mat mot goc. */
+  #safe { position: absolute; left: 50%; top: 50%; width: var(--safe-w, 1280px); height: 720px;
+    transform: translate(-50%, -50%) scale(var(--k, 1)); transform-origin: center; }
   /* Class compact-village de village.js noi rong canvas theo ty le khung (xem fitCanvas),
      nho vay tranh phu kin 16:9 ma khong bi cat hai ben. */
   .compact-village { position: absolute; inset: 0; }
   .village-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  /* village.js chi noi duoc canvas theo chieu NGANG (toi thieu 480x280). Man hinh hep hon
+     ty le do - dien thoai cam doc, man 4:3 - thi phai de tranh giu nguyen ty le va chua
+     tren duoi, neu khong tranh bi keo dan meo het ca nha cua va nguoi. */
+  #stage.letterbox .village-canvas { object-fit: contain; object-position: center; }
 
   #vignette { position: absolute; inset: 0; pointer-events: none;
     background: radial-gradient(ellipse at center, #0000 32%, #0b1417cc 100%); }
@@ -224,6 +233,13 @@
 
   /* Dien thoai cam doc: khung 16:9 chi chiem mot dai hep giua man hinh. Mach nguoi dung
      xoay ngang, luc do phim phu gan kin. Chi hien o man nho va dang cam doc. */
+  /* Vung an toan hep hon khi man hinh hep: cung be ngang do, chu hien to hon han. Cac
+     luoi phai xep lai cho vua be ngang moi, neu khong se tran ra ngoai. */
+  #stage.narrow #cards { grid-template-columns: repeat(4, 124px); }
+  #stage.narrow #feats { grid-template-columns: repeat(2, 300px); }
+  #stage.narrow #channels { padding: 0 60px; }
+  #stage.narrow #tally { right: 28px; }
+
   #rotate { display: none; }
   @media (orientation: portrait) and (max-width: 860px) {
     #rotate { display: block; position: fixed; left: 0; right: 0; bottom: 22px; z-index: 9;
@@ -250,48 +266,53 @@
       <span id="voice-note"></span>
     </div>
 
-    <div id="entry">
-      <h3>Ghé vào làng.</h3>
-      <div class="field">Tên của bạn…</div>
-      <div class="field">Mã phòng (VD: A1B2C)</div>
-      <div class="go">Thắp lửa · Tạo phòng</div>
-      <div class="note">KHÔNG CẦN TÀI KHOẢN</div>
-    </div>
+    <!-- Vung an toan: moi thu trong day co gian theo man hinh nhung giu nguyen bo cuc,
+         nen khong bao gio bi cat. Tranh ngoi lang thi phu kin man hinh o ngoai. -->
+    <div id="safe">
+      <div id="entry">
+        <h3>Ghé vào làng.</h3>
+        <div class="field">Tên của bạn…</div>
+        <div class="field">Mã phòng (VD: A1B2C)</div>
+        <div class="go">Thắp lửa · Tạo phòng</div>
+        <div class="note">KHÔNG CẦN TÀI KHOẢN</div>
+      </div>
 
-    <div id="cards"></div>
-    <div id="eyes"><i></i><i></i></div>
+      <div id="cards"></div>
+      <div id="eyes"><i></i><i></i></div>
 
-    <div id="channels">
-      <div class="chan village"><b>🏘️ LÀNG</b><span class="dots"><i></i><i></i><i></i></span></div>
-      <div class="chan wolf"><b>🐺 BẦY SÓI</b><span class="dots"><i></i><i></i><i></i></span></div>
-      <div class="chan dead"><b>👻 ÂM PHỦ</b><span class="dots"><i></i><i></i><i></i></span></div>
-    </div>
+      <div id="channels">
+        <div class="chan village"><b>🏘️ LÀNG</b><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="chan wolf"><b>🐺 BẦY SÓI</b><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="chan dead"><b>👻 ÂM PHỦ</b><span class="dots"><i></i><i></i><i></i></span></div>
+      </div>
 
-    <div id="tally">
-      <h4>KẾT QUẢ BỎ PHIẾU</h4>
-      <div class="row"><span>Minh</span><em>●●●</em></div>
-      <div class="row"><span>Nguyệt</span><em>●●</em></div>
-      <div class="row"><span>Phước</span><em>●</em></div>
-    </div>
+      <div id="tally">
+        <h4>KẾT QUẢ BỎ PHIẾU</h4>
+        <div class="row"><span>Minh</span><em>●●●</em></div>
+        <div class="row"><span>Nguyệt</span><em>●●</em></div>
+        <div class="row"><span>Phước</span><em>●</em></div>
+      </div>
 
-    <div id="feats"></div>
+      <div id="feats"></div>
 
-    <p id="eyebrow" class="beat"></p>
-    <h2 id="headline" class="beat"></h2>
-    <p id="narration" class="beat"></p>
-    <p id="caption" class="beat"></p>
+      <p id="eyebrow" class="beat"></p>
+      <h2 id="headline" class="beat"></h2>
+      <p id="narration" class="beat"></p>
+      <p id="caption" class="beat"></p>
 
-    <div id="logo">
-      <h1>TRĂNG KHUYẾT</h1>
-      <p>MA SÓI ONLINE</p>
-      <hr />
-      <small>3–20 người · 16 vai trò · không cần tài khoản</small>
-    </div>
-    <div id="cta">
-      <a href="https://game-ma-soi-1.onrender.com" target="_blank" rel="noopener">
-        Thắp lửa · Vào chơi ngay <span aria-hidden="true">↗</span>
-      </a>
-      <em>CHƠI NGAY TRÊN ĐIỆN THOẠI HOẶC MÁY TÍNH</em>
+      <div id="logo">
+        <h1>TRĂNG KHUYẾT</h1>
+        <p>MA SÓI ONLINE</p>
+        <hr />
+        <small>3–20 người · 16 vai trò · không cần tài khoản</small>
+      </div>
+      <div id="cta">
+        <a href="https://game-ma-soi-1.onrender.com" target="_blank" rel="noopener">
+          Thắp lửa · Vào chơi ngay <span aria-hidden="true">↗</span>
+        </a>
+        <em>CHƠI NGAY TRÊN ĐIỆN THOẠI HOẶC MÁY TÍNH</em>
+      </div>
+
     </div>
 
     <div id="tip">BẤM VÀO MÀN HÌNH ĐỂ TẠM DỪNG</div>
@@ -315,11 +336,21 @@
     eyes: $('eyes'), channels: $('channels'), tally: $('tally'), dim: $('dim'),
     feats: $('feats'), cta: $('cta'),
   };
+  const safe = $('safe');
   const OVERLAYS = [el.cards, el.logo, el.entry, el.eyes, el.channels, el.tally, el.dim, el.feats, el.cta];
   const TEXTS = [el.eyebrow, el.headline, el.narration, el.caption];
 
+  // Man hinh cang hep thi vung an toan cang hep lai, nho vay chu khong bi be ti tren dien
+  // thoai. Chieu cao luon 720 nen bo cuc theo chieu doc khong doi.
   function fitStage() {
-    stage.style.transform = `scale(${Math.min(innerWidth / 1280, innerHeight / 720)})`;
+    const ratio = innerWidth / innerHeight;
+    const narrow = ratio < 1.2;
+    const safeW = narrow ? 960 : 1280;
+    stage.classList.toggle('narrow', narrow);
+    // 480/280 la ty le goc cua tranh - hep hon the thi tranh khong noi them duoc nua
+    stage.classList.toggle('letterbox', ratio < 480 / 280);
+    stage.style.setProperty('--safe-w', safeW + 'px');
+    stage.style.setProperty('--k', Math.min(innerWidth / safeW, innerHeight / 720));
   }
   addEventListener('resize', fitStage); fitStage();
 
@@ -580,7 +611,7 @@
       node.className = `bubble ${b.cls}`;
       node.style.left = b.x + 'px'; node.style.top = b.y + 'px';
       node.textContent = b.text;
-      stage.appendChild(node);
+      safe.appendChild(node);
       requestAnimationFrame(() => node.classList.add('on'));
       after(b.live, () => { node.classList.add('off'); after(400, () => node.remove()); });
     }));
@@ -684,7 +715,7 @@
     paused = false; pausedAt = 0; clockFrom = performance.now();
     stage.classList.remove('paused');
     stopVoice();
-    document.querySelectorAll('.bubble').forEach((n) => n.remove());
+    safe.querySelectorAll('.bubble').forEach((n) => n.remove());
     hideAll();
     stage.classList.remove('ending');
     stage.classList.add('playing');

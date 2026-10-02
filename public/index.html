@@ -11,8 +11,8 @@
   <header class="site-header">
     <div class="brand"><span class="brand-moon" aria-hidden="true">◒</span><div>TRĂNG KHUYẾT<small>MA SÓI ONLINE</small></div></div>
     <span class="header-note">Một ngôi làng. Nhiều bí mật.</span>
-    <!-- target=_blank de nguoi dang choi do mo huong dan ma khong roi khoi phong -->
-    <a class="btn-secondary small header-link" href="tutorial.html" target="_blank" rel="noopener">📖 Hướng dẫn</a>
+    <!-- Mo popup ngay trong trang, khong chuyen trang: nguoi dang choi do van o trong phong -->
+    <button id="btn-tutorial" class="btn-secondary small" type="button">📖 Hướng dẫn</button>
     <div class="audio-settings" aria-label="Âm thanh">
       <button id="btn-toggle-narrator" class="btn-secondary small" aria-pressed="true">🔊 Dẫn chuyện: Bật</button>
       <button id="btn-toggle-music" class="btn-secondary small" aria-pressed="false">🎵 Nhạc nền: Tắt</button>
@@ -221,6 +221,85 @@
   </section>
   </div>
 
+  <!-- POPUP HUONG DAN - mo duoc o moi man hinh, ke ca dang choi do -->
+  <div id="tutorial" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-box">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">TRĂNG KHUYẾT · MA SÓI ONLINE</p>
+          <h2 id="tutorial-title">Hướng dẫn chơi</h2>
+        </div>
+        <button id="btn-tutorial-close" class="modal-close" type="button" aria-label="Đóng hướng dẫn">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="tut-lead">Ngôi làng có Sói trà trộn. Ban đêm Sói đi săn, ban ngày cả làng bỏ phiếu
+          tìm Sói. Web lo hết phần quản trò — bạn chỉ việc suy luận.</p>
+
+        <h3>Luật trong một phút</h3>
+        <div class="tut-steps">
+          <div><b>BƯỚC 1 · NHẬN VAI</b><p>Mỗi người nhận một lá bài riêng, chỉ mình bạn thấy. Đọc kỹ
+            năng lực rồi bấm “Tôi đã đọc vai, sẵn sàng!”.</p></div>
+          <div><b>BƯỚC 2 · ĐÊM</b><p>Cả làng nhắm mắt. Bầy Sói chọn người để cắn, Tiên tri soi, Bảo vệ
+            che chắn, Phù thủy cứu hoặc giết. Mỗi vai được gọi theo lượt.</p></div>
+          <div><b>BƯỚC 3 · NGÀY</b><p>Biết ai đã chết nhưng không biết vai gì. Thảo luận, buộc tội,
+            rồi bỏ phiếu treo cổ. Hết Sói là Làng thắng.</p></div>
+        </div>
+
+        <h3>Toàn bộ vai trò</h3>
+        <p class="tut-sub">Chủ phòng chọn những vai nào có mặt trước khi bắt đầu. Các vai mở rộng mặc
+          định để số lượng 0.</p>
+        <div class="tut-filters" id="tut-filters">
+          <button type="button" data-team="all" aria-pressed="true">Tất cả</button>
+          <button type="button" data-team="village" aria-pressed="false">Phe Làng</button>
+          <button type="button" data-team="wolf" aria-pressed="false">Phe Sói</button>
+          <button type="button" data-team="solo" aria-pressed="false">Thắng riêng</button>
+        </div>
+        <div class="tut-roles" id="tut-roles"></div>
+        <p id="tut-roles-error" class="error-text hidden">Không tải được danh sách vai trò. Hãy tải lại trang.</p>
+
+        <h3>Ba kênh trò chuyện riêng</h3>
+        <p class="tut-sub">Cả chat chữ lẫn nói bằng giọng thật đều tự tách kênh. Không ai đọc hay nghe
+          được kênh của người khác, kể cả chủ phòng.</p>
+        <div class="tut-chan village"><b>🏘️ LÀNG</b><span>Mở ở sảnh chờ, lúc thảo luận và bỏ phiếu ban
+          ngày, và sau khi ván kết thúc. Người đã chết chỉ được đọc.</span></div>
+        <div class="tut-chan wolf"><b>🐺 BẦY SÓI</b><span>Chỉ Sói còn sống đọc được, dùng vào ban đêm.
+          Kẻ bị nguyền sau khi hóa Sói chỉ thấy tin từ lúc gia nhập bầy.</span></div>
+        <div class="tut-chan dead"><b>👻 ÂM PHỦ</b><span>Người đã mất trò chuyện với nhau bất cứ lúc nào,
+          kể cả ban ngày. Người còn sống không đọc được.</span></div>
+
+        <h3>Những gì web làm thay quản trò</h3>
+        <div class="tut-feats">
+          <div><span>🎭</span><p><b>Chia vai riêng tư</b>Mỗi người chỉ thấy lá bài của mình.</p></div>
+          <div><span>🌙</span><p><b>Dẫn từng lượt đêm</b>Gọi đúng thứ tự Sói, Tiên tri, Bảo vệ, Phù thủy…</p></div>
+          <div><span>⏱️</span><p><b>Đếm giờ, tự chuyển pha</b>Hết giờ tự sang bước sau.</p></div>
+          <div><span>🗳️</span><p><b>Gom phiếu, báo kết quả</b>Tổng hợp phiếu và công bố người bị treo cổ.</p></div>
+          <div><span>🎙️</span><p><b>Nói bằng giọng thật</b>Bấm “Bật mic”, tự vào đúng kênh theo phe.</p></div>
+          <div><span>🔊</span><p><b>Giọng dẫn chuyện</b>Đọc to “Bầy Sói hãy dậy”. Tắt được.</p></div>
+          <div><span>🎤</span><p><b>Tin nhắn thoại</b>Ghi tối đa 20 giây rồi gửi vào chat.</p></div>
+          <div><span>🔌</span><p><b>Rớt mạng vẫn vào lại</b>Giữ chỗ 30 giây, vào lại đúng vai.</p></div>
+        </div>
+
+        <h3>Mẹo khi chơi</h3>
+        <ul class="tut-tips">
+          <li><strong>Đọc lại vai bất cứ lúc nào</strong> bằng nút “Xem vai trò của tôi”.</li>
+          <li><strong>Kết quả soi của Tiên tri được lưu riêng</strong>, hiện cả sau khi vào lại và ở màn
+            hình kết thúc.</li>
+          <li><strong>Muốn bỏ qua ngày</strong> thì mỗi người còn sống bấm “Bỏ qua ngày → Đêm tiếp theo”.
+            Tất cả đồng ý thì vào đêm luôn, không treo cổ ai.</li>
+          <li><strong>Khi có người chết chỉ hiện tên, không lộ vai.</strong> Vai chỉ công bố ở bảng tổng
+            kết cuối ván.</li>
+          <li><strong>Chủ phòng mất mạng</strong> thì sau 30 giây quyền tự chuyển cho người khác.</li>
+          <li><strong>Phòng 3–5 người</strong> hợp để chơi thử. Đông vui nhất khoảng 12–15 người.</li>
+        </ul>
+
+        <p class="tut-note">Ghi âm và nói bằng mic cần trang chạy trên HTTPS (hoặc localhost). Nếu trình
+          duyệt chặn tự phát tiếng, bấm “Nghe trò chuyện” một lần là nghe được.</p>
+      </div>
+    </div>
+  </div>
+
   <audio id="bgm-day" loop preload="none" src="sounds/bgm-day.wav"></audio>
   <audio id="bgm-night" loop preload="none" src="sounds/bgm-night.wav"></audio>
 
@@ -231,5 +310,6 @@
   <script src="voice.js"></script>
   <script src="voice-relay.js"></script>
   <script src="audio.js"></script>
+  <script src="tutorial.js"></script>
 </body>
 </html>

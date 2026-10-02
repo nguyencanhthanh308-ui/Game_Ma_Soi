@@ -599,11 +599,6 @@ body { transition: background .6s ease, color .6s ease; }
 /* ---- Hai nut am thanh nam tren header ----
    Truoc day chung nam cuoi khung voice; khi khung voice co lai tren man hinh thap
    thi bi day vao vung cuon ben trong, kho bam. Tren header thi luc nao cung thay. */
-/* Nut Huong dan trong thanh dau trang: la the <a> nen phai tu can giua chu, phan con lai
-   muon kieu dang cua .btn-secondary.small. */
-.header-link { display: inline-flex; align-items: center; justify-content: center;
-  width: auto; min-height: 38px; padding: 8px 12px; margin: 0; font-size: 11px;
-  white-space: nowrap; text-decoration: none; flex-shrink: 0; }
 .audio-settings { display: flex; gap: 8px; flex-shrink: 0; }
 .audio-settings button { margin: 0; width: auto; min-height: 38px; padding: 8px 12px; font-size: 11px; white-space: nowrap; }
 .site-header { flex-wrap: wrap; row-gap: 10px; }
@@ -724,3 +719,112 @@ body { transition: background .6s ease, color .6s ease; }
    bi dinh gach ngang cua dong nguoi chet (text-decoration lan xuong ca the con block). */
 .player-list li { flex-wrap: wrap; }
 .player-list li .death-cause { flex-basis: 100%; font-size: .78rem; color: var(--text-dim); font-style: italic; display: inline-block; width: 100%; }
+
+
+/* ======================= POPUP HUONG DAN =======================
+   Mo ngay trong trang chu khong chuyen trang: nguoi dang choi do van o trong phong,
+   khong bi rot ket noi. */
+#btn-tutorial { width: auto; min-height: 38px; padding: 8px 12px; margin: 0;
+  font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+.modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center;
+  justify-content: center; padding: 24px; }
+.modal-backdrop { position: absolute; inset: 0; background: #060e10d9; }
+.modal-box { position: relative; width: 100%; max-width: 860px; max-height: 88vh;
+  display: flex; flex-direction: column; background: linear-gradient(145deg, #1c2d2e, #121f21);
+  border: 1px solid #3b4b44; border-top: 2px solid var(--accent); border-radius: 5px;
+  box-shadow: 0 30px 80px #000a; }
+.modal-head { display: flex; align-items: flex-start; gap: 16px; padding: 24px 26px 18px;
+  border-bottom: 1px solid var(--border); }
+.modal-head > div { flex: 1; }
+.modal-head .eyebrow { margin: 0 0 6px; font-size: 9px; }
+.modal-head h2 { font: 400 28px Georgia, serif; letter-spacing: -.5px; }
+.modal-close { width: 38px; min-height: 38px; padding: 0; margin: 0; flex-shrink: 0;
+  background: #213632; color: var(--text); border: 1px solid var(--border);
+  border-radius: 3px; font-size: 15px; cursor: pointer; }
+.modal-close:hover { background: #2c443d; }
+/* Chi cuon trong khung popup, khong keo ca trang phia sau */
+.modal-body { overflow-y: auto; padding: 22px 26px 30px; }
+.modal-body h3 { font: 400 21px Georgia, serif; margin: 30px 0 6px; color: var(--text); }
+.modal-body h3:first-of-type { margin-top: 18px; }
+.tut-lead { font-size: 14px; color: var(--text-dim); line-height: 1.8; }
+.tut-sub { font-size: 12.5px; color: var(--text-dim); margin-bottom: 14px; }
+
+.tut-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+.tut-steps > div { background: #101d20; border: 1px solid var(--border);
+  border-top: 2px solid var(--accent); padding: 16px; }
+.tut-steps b { display: block; font: 600 9px 'Courier New', monospace; letter-spacing: 1.5px;
+  color: var(--accent-2); margin-bottom: 8px; }
+.tut-steps p { font-size: 12.5px; color: var(--text-dim); line-height: 1.7; }
+
+.tut-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.tut-filters button { width: auto; min-height: 36px; margin: 0; padding: 8px 14px;
+  font-size: 12px; background: #16262a; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 3px; }
+.tut-filters button[aria-pressed='true'] { background: #213632; color: var(--text);
+  border-color: #4a6159; }
+
+.tut-roles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.tut-role { background: #101d20; border: 1px solid var(--border); border-left: 3px solid var(--border);
+  padding: 15px 17px; }
+.tut-role.village { border-left-color: var(--village); }
+.tut-role.wolf { border-left-color: var(--wolf); }
+.tut-role.solo { border-left-color: #b58fc9; }
+.tut-role .top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.tut-role .ico { font-size: 22px; line-height: 1; }
+.tut-role h4 { flex: 1; font: 400 17px Georgia, serif; }
+.tut-role .tag { font: 600 8px 'Courier New', monospace; letter-spacing: 1.2px;
+  padding: 3px 7px; border: 1px solid; border-radius: 2px; white-space: nowrap; }
+.tut-role .tag.village { color: var(--village); border-color: #4fb0a555; }
+.tut-role .tag.wolf { color: var(--wolf); border-color: #dcae6955; }
+.tut-role .tag.solo { color: #b58fc9; border-color: #b58fc955; }
+.tut-role dt { font: 600 8px 'Courier New', monospace; letter-spacing: 1.2px;
+  color: #7f9389; margin-top: 10px; }
+.tut-role dt:first-child { margin-top: 0; }
+.tut-role dd { font-size: 12.5px; color: var(--text-dim); line-height: 1.65; margin-top: 2px; }
+
+.tut-chan { display: flex; gap: 14px; align-items: flex-start; padding: 13px 16px;
+  margin-bottom: 10px; background: #101d20; border: 1px solid var(--border);
+  border-left: 3px solid; }
+.tut-chan.village { border-left-color: var(--village); }
+.tut-chan.wolf { border-left-color: var(--wolf); }
+.tut-chan.dead { border-left-color: #8fb6c9; }
+.tut-chan b { min-width: 118px; font: 600 12px 'Courier New', monospace; letter-spacing: 1px; }
+.tut-chan.village b { color: var(--village); }
+.tut-chan.wolf b { color: var(--wolf); }
+.tut-chan.dead b { color: #8fb6c9; }
+.tut-chan span { font-size: 12.5px; color: var(--text-dim); line-height: 1.7; }
+
+.tut-feats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 14px; }
+.tut-feats > div { display: flex; gap: 12px; padding: 13px 15px; background: #101d20;
+  border: 1px solid var(--border); }
+.tut-feats span { font-size: 19px; line-height: 1.2; }
+.tut-feats p { font-size: 12.5px; color: var(--text-dim); line-height: 1.6; }
+.tut-feats b { display: block; color: var(--text); font-size: 13.5px; font-weight: 600;
+  margin-bottom: 2px; }
+
+.tut-tips { list-style: none; margin-top: 12px; }
+.tut-tips li { position: relative; padding-left: 18px; margin-bottom: 9px;
+  font-size: 13px; color: var(--text-dim); line-height: 1.7; }
+.tut-tips li::before { content: '▪'; position: absolute; left: 3px; color: var(--accent); }
+.tut-tips strong { color: var(--text); font-weight: 600; }
+
+.tut-note { margin-top: 24px; padding: 14px 16px; background: #16262a;
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  font-size: 12.5px; color: var(--text-dim); line-height: 1.7; }
+
+@media (max-width: 760px) {
+  .modal { padding: 0; }
+  .modal-box { max-width: none; max-height: 100vh; max-height: 100svh; height: 100%;
+    border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; }
+  .modal-head { padding: 18px 18px 14px; }
+  .modal-head h2 { font-size: 23px; }
+  .modal-body { padding: 18px 18px 40px; }
+  .tut-steps, .tut-roles, .tut-feats { grid-template-columns: 1fr; }
+  .tut-chan { flex-direction: column; gap: 4px; }
+}
+:root.theme-day .modal-backdrop { background: #3a2f1ccc; }
+:root.theme-day .modal-box { background: linear-gradient(145deg, #fdf6e6, #f3e9d2);
+  border-color: #c6b183; }
+:root.theme-day .tut-steps > div, :root.theme-day .tut-role, :root.theme-day .tut-chan,
+:root.theme-day .tut-feats > div, :root.theme-day .tut-note { background: #faf1dd; }
+:root.theme-day .modal-close { background: #e8dabb; color: #3b3323; border-color: #c6b183; }

@@ -51,6 +51,8 @@ test('saved bite victim counts toward living village and guard can skip', () => 
   const [g,[guard,wolf,target]]=setup(['guard','werewolf','villager']);
   g.phase=PHASE.NIGHT_GUARD;
   g.recordAction(io,noop,guard.id,'guard_protect',{targetId:null});
+  assert.equal(g.phase,PHASE.NIGHT_GUARD,'bam xong van cho het gio moi chuyen pha');
+  g._advanceFromTimer(io,noop);
   assert.equal(g.phase,PHASE.NIGHT_WOLVES);
   g.night.guardTarget=target.id;g.night.wolfVictims=[target.id];
   g._resolveNight(io,noop);assert.equal(g._checkWinCondition(),null);
@@ -64,6 +66,7 @@ test('witch can heal then poison, with victim hidden after heal is consumed', ()
   assert.equal(g.getPhasePrompt(witch).step,'poison');
   assert.equal(g.getPhasePrompt(witch).victimName,null);
   g.recordAction(io,noop,witch.id,'witch_action',{poisonTargetId:target.id});
+  g._advanceFromTimer(io,noop);
   assert.ok(victim.alive);assert.equal(target.alive,false);
   assert.ok(witch.hasUsedHeal&&witch.hasUsedPoison);
 });
@@ -72,7 +75,8 @@ test('witch can skip heal then poison; timeout preserves an accepted heal', () =
   g.phase=PHASE.NIGHT_WITCH;g.night.currentWolfVictim=victim.id;g.night.wolfVictims=[victim.id];
   g.recordAction(io,noop,witch.id,'witch_action',{heal:false});
   assert.equal(g.getPhasePrompt(witch).step,'poison');assert.equal(witch.hasUsedHeal,false);
-  g.recordAction(io,noop,witch.id,'witch_action',{});assert.equal(victim.alive,false);
+  g.recordAction(io,noop,witch.id,'witch_action',{});
+  g._advanceFromTimer(io,noop);assert.equal(victim.alive,false);
   const [h,[w,v]]=setup(['witch','villager']);h.phase=PHASE.NIGHT_WITCH;h.night.currentWolfVictim=v.id;h.night.wolfVictims=[v.id];
   h.recordAction(io,noop,w.id,'witch_action',{heal:true});h._advanceFromTimer(io,noop);assert.ok(v.alive);
 });
@@ -159,6 +163,7 @@ test('seer retains private results across phases and clears them for a new game'
   g.phase=PHASE.NIGHT_SEER;
   g.recordAction(io,noop,seer.id,'seer_check',{targetId:wolf.id});
   assert.equal(seer.seerResults[0].isWolf,true);
+  g._advanceFromTimer(io,noop);
   g.nightNumber=2;g.phase=PHASE.NIGHT_SEER;
   g.recordAction(io,noop,seer.id,'seer_check',{targetId:villager.id});
   assert.equal(seer.seerResults[1].isWolf,false);
@@ -175,9 +180,11 @@ test('dead hunter can shoot; another player cannot take the shot', () => {
 test('cub killed by lover chain triggers two distinct bites next night', () => {
   const [g,[cub,lover,wolf,a,b]]=setup(['wolfcub','villager','werewolf','villager','villager']);lover.loverId=cub.id;
   g._applyDeaths(io,[lover.id]);g.enterNight(io,noop);g.phase=PHASE.NIGHT_WOLVES;
-  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:a.id});assert.equal(g.night.wolfRound,2);
-  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:a.id});assert.equal(g.night.wolfVictims.length,1);
-  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:b.id});assert.deepEqual(g.night.wolfVictims,[a.id,b.id]);
+  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:a.id});
+  g._advanceFromTimer(io,noop);assert.equal(g.night.wolfRound,2);
+  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:a.id});assert.equal(g.night.wolfVictims.length,1,'can trung nguoi cu thi luot hai khong tinh');
+  g.recordAction(io,noop,wolf.id,'wolf_vote',{targetId:b.id});
+  g._advanceFromTimer(io,noop);assert.deepEqual(g.night.wolfVictims,[a.id,b.id]);
   g._resolveNight(io,noop);assert.equal(a.alive,false);assert.equal(b.alive,false);
 });
 test('white wolf participates in pack but prevents ordinary wolf victory', () => {

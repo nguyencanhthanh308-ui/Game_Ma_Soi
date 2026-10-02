@@ -34,16 +34,19 @@ test('Soi trang giet duoc nhieu lan chu khong chi mot lan ca van', (t) => {
   const [g, [ww, wolfA, wolfB]] = setup(['whitewolf', 'werewolf', 'werewolf', 'villager', 'villager']);
   g.nightNumber = 2;
   g.phase = PHASE.NIGHT_WHITEWOLF;
-  assert.equal(g.recordAction(io, noop, ww.id, 'whitewolf_kill', { targetId: wolfA.id }).ok, true);
-  assert.equal(g.night.whiteWolfTarget, wolfA.id);
+  assert.equal(g.recordAction(io, noop, ww.id, 'whitewolf_kill', { targetId: wolfB.id }).ok, true);
+  assert.equal(g.night.whiteWolfTarget, wolfB.id);
+  // Phai het gio roi sang pha sau that su: chuyen pha moi tang actionVersion, khong co
+  // buoc nay thi luot sau bi coi la doi y trong cung mot luot.
+  g._advanceFromTimer(io, noop);
 
   // Dem thu tu: van con luot, van giet duoc
   g.nightNumber = 4;
   g.night = g._emptyNightActions();
   g.phase = PHASE.NIGHT_WHITEWOLF;
   assert.equal(g._whiteWolfActsTonight(), true, 'da dung 1 lan van con luot');
-  assert.equal(g.recordAction(io, noop, ww.id, 'whitewolf_kill', { targetId: wolfB.id }).ok, true);
-  assert.equal(g.night.whiteWolfTarget, wolfB.id);
+  assert.equal(g.recordAction(io, noop, ww.id, 'whitewolf_kill', { targetId: wolfA.id }).ok, true);
+  assert.equal(g.night.whiteWolfTarget, wolfA.id);
 });
 
 test('Soi trang chet roi van duoc goi dung lich (de khong lo no da chet), nhung khong ai hanh dong', (t) => {

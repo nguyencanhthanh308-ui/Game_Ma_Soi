@@ -46,8 +46,10 @@ const DEFAULT_DURATIONS = {
   DAY_RESOLVE: 5,
 };
 
-// Khi tat ca da bo phieu, khong chot ngay ma de lai ngan nay giay cho ai muon doi y.
-const CHANGE_VOTE_GRACE_MS = 5000;
+// MOI PHA DEU CHAY HET DONG HO roi moi chuyen, ke ca khi tat ca da hanh dong xong.
+// Truoc day pha tu chot som ngay khi nguoi cuoi bam, nen ai cham tay la mat luot: dang
+// can nhac thi man hinh da nhay sang pha khac. Nhip co dinh thi de theo doi hon nhieu,
+// va ai cung con thoi gian doi y cho den giay cuoi.
 // Chia vai: chi nho vai cua van NGAY TRUOC, thu toi da 300 cach xao de tranh trung vai do.
 // Nho nhieu van hon thi it lap vai hon, nhung nguoi choi suy ra duoc vai cua minh:
 // ai lam Soi vai van lien tiep se biet chac van nay minh khong phai Soi.
@@ -363,15 +365,6 @@ class Game {
   }
 
   // Rut ngan pha dang chay xuong con ms mili giay (khong bao gio keo dai them).
-  _shortenPhase(io, broadcastFn, ms, onEnd) {
-    const endsAt = Date.now() + ms;
-    if (this.phaseEndsAt !== null && this.phaseEndsAt <= endsAt) return;
-    if (this.timer) clearTimeout(this.timer);
-    this.phaseEndsAt = endsAt;
-    this.timer = setTimeout(onEnd, ms);
-    this.timer.unref?.();
-  }
-
   _advanceFromTimer(io, broadcastFn) {
     switch (this.phase) {
       case PHASE.NIGHT_CUPID:
@@ -477,7 +470,7 @@ class Game {
         this.players.get(a).loverId = b;
         this.players.get(b).loverId = a;
         this.night.cupidPairChosen = true;
-        this._goToPhase(io, broadcastFn, PHASE.NIGHT_GUARD);
+        broadcastFn();   // de dong ho chay het, khong chot som
         return true;
       }
       return;
@@ -487,25 +480,21 @@ class Game {
       const target = payload.targetId;
       if (target && target === this.lastProtectedId) return; // khong duoc trung nguoi cu
       this.night.guardTarget = target || null;
-      this._goToPhase(io, broadcastFn, PHASE.NIGHT_WOLVES);
+      broadcastFn();
       return true;
     }
 
     if (this.phase === PHASE.NIGHT_WOLVES && type === 'wolf_vote' && isWolfTeam(player.role)) {
       if (!payload.targetId) return;
       this.night.wolfVotes[player.id] = payload.targetId;
-      const wolves = this.aliveWolves();
-      const allVoted = wolves.every((w) => this.night.wolfVotes[w.id] !== undefined);
-      if (allVoted) {
-        this._finishWolfRound(io, broadcastFn);
-      }
+      broadcastFn();   // ca bay thay phieu cua nhau ngay, nhung van cho het gio
       return true;
     }
 
     if (this.phase === PHASE.NIGHT_WHITEWOLF && type === 'whitewolf_kill' && player.role === 'whitewolf') {
       this.night.whiteWolfTarget = payload.targetId || 'skip';
       if (payload.targetId) player.hasUsedWhiteKill = true; // chi de hien thi, khong con chan luot sau
-      this._goToPhase(io, broadcastFn, PHASE.NIGHT_SEER);
+      broadcastFn();
       return true;
     }
 
@@ -522,7 +511,7 @@ class Game {
         player.seerResults = [...(player.seerResults || []), result];
         io.to(player.socketId).emit('seer_result', result);
       }
-      this._goToPhase(io, broadcastFn, PHASE.NIGHT_WITCH);
+      broadcastFn();
       return true;
     }
 
@@ -542,7 +531,7 @@ class Game {
           broadcastFn();
           return true;
         }
-        this._resolveNight(io, broadcastFn);
+        broadcastFn();
         return true;
       }
       if (payload.heal !== undefined) return;
@@ -550,16 +539,12 @@ class Game {
         this.night.witchPoisonTarget = payload.poisonTargetId;
         player.hasUsedPoison = true;
       }
-      this._resolveNight(io, broadcastFn);
+      broadcastFn();
       return true;
     }
 
     if (this.phase === PHASE.DAY_VOTE && type === 'day_vote') {
       this.dayVotes[player.id] = payload.targetId || null; // null = bo phieu trang
-      // Du phieu roi thi khong chot ngay: de lai vai giay cho ai muon doi y.
-      if (this.alivePlayers().every((p) => this.dayVotes[p.id] !== undefined)) {
-        this._shortenPhase(io, broadcastFn, CHANGE_VOTE_GRACE_MS, () => this._resolveDayVote(io, broadcastFn));
-      }
       broadcastFn(); // cap nhat bang phieu truc tiep cho ca phong
       return true;
     }
@@ -568,10 +553,6 @@ class Game {
       if (player.id === this.accusedId) return; // nguoi bi xu khong duoc tu bo phieu
       if (player.loverId === this.accusedId && payload.verdict === 'kill') return; // khong bo phieu treo co nguoi minh yeu
       this.judgeVotes[player.id] = payload.verdict;
-      const voters = this.alivePlayers().filter((p) => p.id !== this.accusedId);
-      if (voters.every((p) => this.judgeVotes[p.id] !== undefined)) {
-        this._shortenPhase(io, broadcastFn, CHANGE_VOTE_GRACE_MS, () => this._resolveJudgement(io, broadcastFn));
-      }
       broadcastFn();
       return true;
     }

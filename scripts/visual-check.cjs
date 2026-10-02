@@ -58,14 +58,18 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
     let wolf;
     for(const p of pages)if(await p.evaluate("state.lastPrivate.role.id === 'werewolf'"))wolf=p;
     await wolf.evaluate("document.querySelector('.target-btn').click();document.querySelector('#action-area > .btn-primary').click()");await pause(200);
-    // Phong 3 nguoi mac dinh co ca Tien tri, nen dem chua het sau luot Soi. Di het cac
-    // luot con lai thay vi doi sang ngay ngay sau luot Soi.
-    for(let i=0;i<6&&String(await host.evaluate('state.lastGameState.phase')).startsWith('NIGHT_');i++){
+    // Moi pha deu chay het dong ho moi chuyen, khong con chot som khi ai cung bam xong.
+    // Nen o day cu bam het cac luot roi CHO den khi troi sang, thay vi doi doi ngay.
+    // Phong 3 nguoi mac dinh co ca Tien tri, nen dem con luot sau luot Soi.
+    const hetDem=Date.now()+150000;
+    let phase=await host.evaluate('state.lastGameState.phase');
+    while(String(phase).startsWith('NIGHT_')&&Date.now()<hetDem){
       for(const p of pages)if(await p.evaluate("!!document.querySelector('.target-btn')"))
         await p.evaluate("document.querySelector('.target-btn').click();document.querySelector('#action-area > .btn-primary').click()");
-      await pause(250);
+      await pause(1000);
+      phase=await host.evaluate('state.lastGameState.phase');
     }
-    assert.equal(await host.evaluate('state.lastGameState.phase'),'DAY_ANNOUNCE');
+    assert.match(phase,/^(DAY_|HUNTER_SHOT|GAME_OVER)/,'het dem phai sang ngay, dang o '+phase);
     await snapshot(host,'day',1366);
     const preview=await page();
     await preview.c('Page.bringToFront');

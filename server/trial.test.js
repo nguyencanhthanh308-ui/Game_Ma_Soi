@@ -52,15 +52,17 @@ test('bo phieu trang duoc, va van doi lai thanh neu ten duoc', (t) => {
   assert.equal(g.publicState().dayVotes[a.id], b.id);
 });
 
-test('du phieu thi khong chot ngay ma de lai vai giay doi y', (t) => {
+test('du phieu van cho het gio, khong chot som', (t) => {
   const [g, players] = setup(3);
   t.after(() => clearTimeout(g.timer));
   const [a, b, c] = players;
   const before = g.phaseEndsAt;
   vote(g, a, c); vote(g, b, c); vote(g, c, a);
-  assert.equal(g.phase, PHASE.DAY_VOTE, 'van con o pha bo phieu de ai muon doi y');
-  assert.ok(g.phaseEndsAt < before, 'nhung thoi gian con lai phai duoc rut ngan');
-  assert.equal(vote(g, a, b).ok, true, 'trong luc cho van doi phieu duoc');
+  assert.equal(g.phase, PHASE.DAY_VOTE, 'du phieu roi van o pha bo phieu');
+  assert.equal(g.phaseEndsAt, before, 'khong duoc rut ngan dong ho: ai cung con quyen doi y den giay cuoi');
+  assert.equal(vote(g, a, b).ok, true, 'van doi phieu duoc');
+  g._advanceFromTimer(io, noop);
+  assert.notEqual(g.phase, PHASE.DAY_VOTE, 'het gio moi chuyen pha');
 });
 
 test('nguoi bi nhieu phieu nhat duoc dua ra bien ho, chua chet ngay', (t) => {

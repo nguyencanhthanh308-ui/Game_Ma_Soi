@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const { Game, PHASE } = require('./Game');
 const io = { to: () => ({ emit() {} }) };
 const noop = () => {};
+// Moi pha deu chay het dong ho moi chuyen, nen test phai tu bao "het gio".
+const hetGio = (g, broadcast = noop) => g._advanceFromTimer(io, broadcast);
 
 function room(t, roles) {
   const g = new Game('FLOW');
@@ -48,6 +50,7 @@ test('invalid actions remain retryable; accepted votes are acknowledged once and
   assert.equal(broadcasts, 1);
   assert.equal(g.recordAction(io, broadcast, wolf.id, 'wolf_vote', { targetId: b.id }, version).ok, false);
   assert.ok(g.recordAction(io, broadcast, otherWolf.id, 'wolf_vote', { targetId: a.id }, version).ok);
+  hetGio(g, broadcast);
   assert.equal(g.night.wolfRound, 2);
   assert.deepEqual(g.night.wolfVictims, [a.id]);
   assert.equal(g.recordAction(io, broadcast, wolf.id, 'wolf_vote', { targetId: b.id }, version).ok, false);
@@ -65,6 +68,7 @@ test('late witch heal does not consume poison or resolve the night again', t => 
   assert.equal(g.phase, PHASE.NIGHT_WITCH); assert.equal(witch.hasUsedPoison, false);
   assert.equal(g.recordAction(io, noop, witch.id, 'witch_action', { poisonTargetId: b.id }, version).ok, false);
   assert.ok(g.recordAction(io, noop, witch.id, 'witch_action', { poisonTargetId: b.id }, g.actionVersion).ok);
+  hetGio(g);
   assert.equal(a.alive, true); assert.equal(b.alive, false);
 });
 
@@ -89,10 +93,14 @@ test('witch healing saves only the first of two wolf victims', t => {
   const [g, [wolf, witch, first, second]] = room(t, ['werewolf', 'witch', 'villager', 'villager']);
   g.phase = PHASE.NIGHT_WOLVES; g.night.remainingBites = 2;
   assert.ok(g.recordAction(io, noop, wolf.id, 'wolf_vote', { targetId: first.id }).ok);
+  hetGio(g);   // het luot can thu nhat, sang luot thu hai cua Soi con
   assert.ok(g.recordAction(io, noop, wolf.id, 'wolf_vote', { targetId: second.id }).ok);
+  hetGio(g);   // het dem Soi, sang cac vai con lai
+  g.phase = PHASE.NIGHT_WITCH;
   assert.equal(g.getPhasePrompt(witch).victimName, first.name);
   assert.ok(g.recordAction(io, noop, witch.id, 'witch_action', { heal: true }).ok);
   assert.ok(g.recordAction(io, noop, witch.id, 'witch_action', {}).ok);
+  hetGio(g);
   assert.equal(first.alive, true); assert.equal(second.alive, false);
 });
 

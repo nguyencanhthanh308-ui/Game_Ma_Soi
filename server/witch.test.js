@@ -70,6 +70,7 @@ test('cuu roi doc: nan nhan cua Soi song, nguoi bi doc chet', (t) => {
   const broadcast = () => {};
   game.recordAction(io, broadcast, witch.id, 'witch_action', { heal: true });
   game.recordAction(io, broadcast, witch.id, 'witch_action', { poisonTargetId: other.id });
+  game._advanceFromTimer(io, broadcast);   // pha chay het gio roi moi tong ket dem
   assert.equal(victim.alive, true, 'nan nhan da duoc binh cuu');
   assert.equal(other.alive, false, 'nguoi bi quang binh doc phai chet');
   assert.equal(witch.hasUsedPoison, true);
@@ -80,6 +81,7 @@ test('bo qua ca hai buoc thi nan nhan cua Soi chet', (t) => {
   const broadcast = () => {};
   game.recordAction(io, broadcast, witch.id, 'witch_action', { heal: false });
   game.recordAction(io, broadcast, witch.id, 'witch_action', {});
+  game._advanceFromTimer(io, broadcast);
   assert.equal(victim.alive, false);
   assert.equal(other.alive, true);
   assert.equal(witch.hasUsedPoison, false, 'bo qua thi van con binh doc');

@@ -109,12 +109,21 @@
   // Truoc day dung object-fit: cover nen bi cat mat mat trang o tren va nha o duoi.
   // Gio chinh be ngang canvas theo dung ty le khung, de ve vua khung ma khong cat, khong meo.
   const WIDE_FRAMES = '.compact-village, .game-village';
+  // Khung cua trang intro phu kin man hinh nen co the CAO hon ty le goc - dien thoai cam
+  // doc chang han. Luc do noi canvas theo chieu doc va ve them troi o tren (xem paint),
+  // thay vi de tranh thanh mot dai mong giua man hinh den.
+  const TALL_FRAMES = '.intro-village';
   function fitCanvas(canvas) {
-    if (!canvas.closest(WIDE_FRAMES)) return;
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
+    if (canvas.closest(TALL_FRAMES) && w / h < 480 / 280) {
+      const wanted = Math.max(280, Math.min(1600, Math.round(480 * h / w)));
+      if (canvas.height !== wanted || canvas.width !== 480) { canvas.width = 480; canvas.height = wanted; }
+      return;
+    }
+    if (!canvas.closest(WIDE_FRAMES)) return;
     const wanted = Math.max(480, Math.min(1440, Math.round(280 * w / h)));
-    if (canvas.width !== wanted) { canvas.width = wanted; canvas.height = 280; }
+    if (canvas.width !== wanted || canvas.height !== 280) { canvas.width = wanted; canvas.height = 280; }
   }
 
   function paint(canvas, time) {
@@ -126,6 +135,18 @@
     ctx.imageSmoothingEnabled=false;
     const W = canvas.width;
     const ox = Math.round((W - 480) / 2); // tranh goc nam giua khung
+    // Khung cao hon ty le goc: ngoi lang van ngoi duoi day, phan du o tren thanh troi.
+    const oy = canvas.height - 280;
+    if (oy > 0) {
+      rect(ctx, day ? '#718e89' : '#0c1e2a', 0, 0, W, oy);
+      for (let i = 0; i < Math.round(W * oy / 900); i++) {
+        ctx.globalAlpha = day ? .12 : .25 + random(i + 1100) * .6;
+        rect(ctx, '#d1dec5', random(i + 1200) * W, random(i + 1300) * oy, i % 7 === 0 ? 2 : 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.save();
+    ctx.translate(0, oy);
     if (ox > 0) {
       // Hai ben la anh soi guong cua lop nen, nen cho noi voi tranh goc khop lien mach
       ctx.save(); ctx.translate(ox, 0); ctx.scale(-1, 1); backdrop(ctx, day); ctx.restore();
@@ -182,6 +203,7 @@
     pine(ctx,19,258,128,day?'#224b3c':'#0c2427','#25423a');
     pine(ctx,right+466,267,143,day?'#214939':'#0a2023','#243f36');
     pine(ctx,right+440,291,94,'#0a2023'); pine(ctx,48,300,93,'#10292a');
+    ctx.restore();
   }
   // One character = one opaque pixel. Authored clusters, no antialiased paths.
   const wolfSprite = [

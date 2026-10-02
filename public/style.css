@@ -366,7 +366,7 @@ input::placeholder { color:#778e87; font-size:12px; }
   .scene-caption { font-size:7px; padding:10px; letter-spacing:.7px; } .scene-footer { font-size:8px; padding:10px; }
 }
 @media (max-width:360px) {
-  .edition { display:none; } .home-world h1 { font-size:43px; }
+  .home-world h1 { font-size:43px; }
   #screen-home.active { padding:24px 14px; } .card { padding:18px; }
   .world-facts>div { flex-direction:column; align-items:flex-start; gap:4px; }
   .world-facts span { max-width:none; } .scene-caption span:last-child { display:none; }
@@ -603,8 +603,13 @@ body { transition: background .6s ease, color .6s ease; }
 .audio-settings button { margin: 0; width: auto; min-height: 38px; padding: 8px 12px; font-size: 11px; white-space: nowrap; }
 .site-header { flex-wrap: wrap; row-gap: 10px; }
 @media (max-width: 760px) {
-  .audio-settings { order: 3; width: 100%; }
-  .audio-settings button { flex: 1 1 auto; }
+  /* Chu trong nut de nowrap nen khong co xuong dong trong nut duoc. Neu ca cum cung
+     khong duoc xuong dong thi ba nut cong lai rong hon man hinh va nut cuoi bi cat.
+     Cho cum xuong dong, moi nut toi thieu 140px roi tu gian cho kin hang. */
+  .audio-settings { order: 3; width: 100%; flex-wrap: wrap; }
+  .audio-settings button { flex: 1 1 140px; }
+  /* Dong trang tri nay an cho nhe dau trang tren dien thoai */
+  .edition { display: none; }
 }
 
 /* ==========================================================================

@@ -274,7 +274,7 @@
 </head>
 <body>
   <div id="stage">
-    <div class="compact-village">
+    <div class="compact-village intro-village">
       <canvas class="village-canvas" width="1280" height="280"
         role="img" aria-label="Ngôi làng pixel Trăng Khuyết"></canvas>
     </div>
@@ -539,12 +539,9 @@
   function updateVoiceNote() {
     const note = $('voice-note');
     if (!unlocked) { note.className = ''; note.textContent = loadNote; return; }
-    if (voiceSource === 'file') { note.className = ''; note.textContent = 'GIỌNG: FILE THU SẴN'; return; }
-    if (voiceSource === 'server') {
-      note.className = '';
-      note.textContent = 'GIỌNG: ' + (ttsBase === '' ? 'máy chủ' : ttsBase.replace(/^https?:\/\//, '')).toUpperCase();
-      return;
-    }
+    // Giong chay binh thuong thi khong can noi gi - day la man cho cua nguoi xem, khong
+    // phai bang chan doan. Chi len tieng khi co truc trac.
+    if (voiceSource !== 'none') { note.className = ''; note.textContent = ''; return; }
     note.className = 'warn';
     note.textContent = viVoice
       ? 'Giọng: trình duyệt'

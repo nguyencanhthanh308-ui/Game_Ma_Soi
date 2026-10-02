@@ -599,6 +599,11 @@ body { transition: background .6s ease, color .6s ease; }
 /* ---- Hai nut am thanh nam tren header ----
    Truoc day chung nam cuoi khung voice; khi khung voice co lai tren man hinh thap
    thi bi day vao vung cuon ben trong, kho bam. Tren header thi luc nao cung thay. */
+/* Nut Huong dan trong thanh dau trang: la the <a> nen phai tu can giua chu, phan con lai
+   muon kieu dang cua .btn-secondary.small. */
+.header-link { display: inline-flex; align-items: center; justify-content: center;
+  width: auto; min-height: 38px; padding: 8px 12px; margin: 0; font-size: 11px;
+  white-space: nowrap; text-decoration: none; flex-shrink: 0; }
 .audio-settings { display: flex; gap: 8px; flex-shrink: 0; }
 .audio-settings button { margin: 0; width: auto; min-height: 38px; padding: 8px 12px; font-size: 11px; white-space: nowrap; }
 .site-header { flex-wrap: wrap; row-gap: 10px; }

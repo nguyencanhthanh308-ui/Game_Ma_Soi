@@ -119,10 +119,47 @@ function onJoinedRoom(roomCode, playerId, name, isHostGuess, sessionToken) {
   state.playerId = playerId;
   state.myName = name;
   sessionStorage.setItem('masoi_session', JSON.stringify({ roomCode, name, sessionToken }));
-  history.replaceState(null, '', '?room=' + roomCode);
+  // pushState chu khong phai replaceState: vao phong la them mot muc vao lich su trinh
+  // duyet, nen bam Quay lai se ve trang chu thay vi thoat han khoi web. Rieng truong hop
+  // dia chi da san ?room=... (mo tu link moi, hoac vua tai lai trang) thi thay cho chu
+  // khong them muc moi, neu khong bam Quay lai mot cai se khong di dau ca.
+  const roomUrl = '?room=' + roomCode;
+  if (location.search === roomUrl) history.replaceState({ room: roomCode }, '', roomUrl);
+  else history.pushState({ room: roomCode }, '', roomUrl);
   $('room-code-display').textContent = roomCode;
   showScreen('screen-lobby');
 }
+
+// Roi phong han va ve trang chu. Bao cho server biet bang leave_room de ghe duoc tra lai
+// ngay, khong phai doi 30 giay nhu luc rot mang.
+function leaveRoom() {
+  socket.emit('leave_room');
+  sessionStorage.removeItem('masoi_session');
+  if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; }
+  Object.assign(state, {
+    roomCode: null, playerId: null, isHost: false,
+    roleConfig: null, roleConfigPlayerCount: null, roleConfigCustomized: false,
+    roleSuggestionPending: false, lastGameState: null, lastPrivate: null,
+    selected: [], submittedForPhase: null, pendingAction: null,
+    selectionKey: null, hasSeenReveal: false,
+  });
+  window.villageArt?.role(null);
+  $('home-error').textContent = '';
+  showScreen('screen-home');
+}
+
+// Nut Quay lai cua trinh duyet
+addEventListener('popstate', () => {
+  if (!state.roomCode) return;   // dang o trang chu roi, khong co gi de roi
+  const phase = state.lastGameState?.phase;
+  const playing = phase && phase !== 'LOBBY';
+  // Dang choi do thi hoi lai: roi phong giua van la khong quay lai duoc nua
+  if (playing && !confirm('Rời phòng và quay về trang chủ? Bạn sẽ không vào lại ván này được.')) {
+    history.pushState({ room: state.roomCode }, '', '?room=' + state.roomCode);
+    return;
+  }
+  leaveRoom();
+});
 
 // Thu tu dong ket noi lai neu vua reload trang (giu phien choi)
 socket.on('connect', function tryAutoRejoin() {

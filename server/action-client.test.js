@@ -23,7 +23,8 @@ function client() {
   const context = vm.createContext({window:{},io:()=>socket,
     document:{getElementById:element,createElement:()=>element(Symbol()),querySelectorAll:()=>[],querySelector:()=>element('screen-game')},
     fetch:async()=>({ok:true,json:async()=>ROLE_INFO}),location:{search:''},URLSearchParams,
-    sessionStorage:{getItem(){return null;},setItem(){}},history:{replaceState(){}},
+    sessionStorage:{getItem(){return null;},setItem(){},removeItem(){}},
+    history:{replaceState(){},pushState(){}},addEventListener(name,fn){events['@'+name]=fn;},confirm:()=>true,
     setTimeout(){},clearTimeout(){},setInterval(){},clearInterval(){},
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../public/app.js'),'utf8'),context);
